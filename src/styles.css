@@ -1,0 +1,439 @@
+@import 'tailwindcss';
+
+/* ============================================================================
+   BiteFlow — "Hospitality Kinetic" design system
+   Ported 1:1 from hospitality_kinetic/DESIGN.md so every screen generated from
+   the Stitch HTML prototypes shares typography, colour, radius and spacing.
+   ========================================================================= */
+
+@theme {
+  /* ------------------------------------------------------------------ Fonts */
+  --font-display: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  --font-body: 'Inter', ui-sans-serif, system-ui, sans-serif;
+
+  --font-display-hero: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  --font-display-hero-mobile: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  --font-headline-xl: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  --font-headline-xl-mobile: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  --font-headline-lg: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  --font-headline-lg-mobile: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  --font-headline-md: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  --font-headline-sm: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  --font-body-lg: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-body-md: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-body-sm: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-label-md: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-label-sm: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-label-xs: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono-metric: 'Inter', ui-sans-serif, system-ui, sans-serif;
+
+  /* ------------------------------------------------------- Type scale (px) */
+  --text-display-hero: 56px;
+  --text-display-hero--line-height: 64px;
+  --text-display-hero--font-weight: 800;
+  --text-display-hero--letter-spacing: -0.025em;
+
+  --text-display-hero-mobile: 36px;
+  --text-display-hero-mobile--line-height: 44px;
+  --text-display-hero-mobile--font-weight: 800;
+  --text-display-hero-mobile--letter-spacing: -0.02em;
+
+  --text-headline-xl: 40px;
+  --text-headline-xl--line-height: 48px;
+  --text-headline-xl--font-weight: 700;
+  --text-headline-xl--letter-spacing: -0.02em;
+
+  --text-headline-xl-mobile: 28px;
+  --text-headline-xl-mobile--line-height: 36px;
+  --text-headline-xl-mobile--font-weight: 700;
+  --text-headline-xl-mobile--letter-spacing: -0.015em;
+
+  --text-headline-lg: 30px;
+  --text-headline-lg--line-height: 38px;
+  --text-headline-lg--font-weight: 700;
+  --text-headline-lg--letter-spacing: -0.015em;
+
+  --text-headline-lg-mobile: 24px;
+  --text-headline-lg-mobile--line-height: 32px;
+  --text-headline-lg-mobile--font-weight: 700;
+  --text-headline-lg-mobile--letter-spacing: -0.01em;
+
+  --text-headline-md: 22px;
+  --text-headline-md--line-height: 28px;
+  --text-headline-md--font-weight: 600;
+  --text-headline-md--letter-spacing: -0.01em;
+
+  --text-headline-sm: 18px;
+  --text-headline-sm--line-height: 26px;
+  --text-headline-sm--font-weight: 600;
+  --text-headline-sm--letter-spacing: -0.005em;
+
+  --text-body-lg: 16px;
+  --text-body-lg--line-height: 24px;
+  --text-body-lg--font-weight: 400;
+
+  --text-body-md: 14px;
+  --text-body-md--line-height: 20px;
+  --text-body-md--font-weight: 400;
+
+  --text-body-sm: 13px;
+  --text-body-sm--line-height: 18px;
+  --text-body-sm--font-weight: 400;
+  --text-body-sm--letter-spacing: 0.005em;
+
+  --text-label-md: 14px;
+  --text-label-md--line-height: 20px;
+  --text-label-md--font-weight: 600;
+  --text-label-md--letter-spacing: 0.01em;
+
+  --text-label-sm: 12px;
+  --text-label-sm--line-height: 16px;
+  --text-label-sm--font-weight: 600;
+  --text-label-sm--letter-spacing: 0.02em;
+
+  --text-label-xs: 11px;
+  --text-label-xs--line-height: 14px;
+  --text-label-xs--font-weight: 700;
+  --text-label-xs--letter-spacing: 0.04em;
+
+  --text-mono-metric: 28px;
+  --text-mono-metric--line-height: 34px;
+  --text-mono-metric--font-weight: 700;
+  --text-mono-metric--letter-spacing: -0.02em;
+
+  /* ----------------------------------------------------------------- Spacing */
+  --spacing-gutter: 1.5rem;
+  --spacing-gutter-mobile: 0.75rem;
+  --spacing-margin: 2rem;
+  --spacing-margin-mobile: 1rem;
+  --spacing-space-2xs: 0.25rem;
+  --spacing-space-xs: 0.375rem;
+  --spacing-space-sm: 0.5rem;
+  --spacing-space-md: 0.75rem;
+  --spacing-space-lg: 1rem;
+  --spacing-space-xl: 1.5rem;
+  --spacing-space-2xl: 2rem;
+  --spacing-space-3xl: 3rem;
+  --spacing-space-4xl: 4rem;
+  --spacing-space-5xl: 6rem;
+  --spacing-sidebar: 16rem;
+
+  /* ------------------------------------------------------------------ Radius */
+  --radius-sm: 0.25rem;
+  --radius-DEFAULT: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --radius-2xl: 1.75rem;
+  --radius-full: 9999px;
+
+  /* ------------------------------------------------------------------ Colours
+     Platform surfaces (Material-style roles from the Stitch token export) */
+  --color-surface: #fff8f6;
+  --color-surface-dim: #efd4cb;
+  --color-surface-bright: #fff8f6;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #fff1ec;
+  --color-surface-container: #ffe9e2;
+  --color-surface-container-high: #fee2d9;
+  --color-surface-container-highest: #f8ddd4;
+  --color-on-surface: #261813;
+  --color-on-surface-variant: #5a4138;
+  --color-inverse-surface: #3d2d27;
+  --color-inverse-on-surface: #ffede7;
+  --color-outline: #8e7166;
+  --color-outline-variant: #e2bfb2;
+  --color-surface-tint: #a73a00;
+  --color-surface-variant: #f8ddd4;
+
+  /* Brand — white-label driven. Tenants override `--bf-brand` at runtime. */
+  --color-primary: var(--bf-brand, #ea580c);
+  --color-on-primary: var(--bf-on-brand, #ffffff);
+  --color-primary-container: var(--bf-brand-dark, #c2410c);
+  --color-on-primary-container: var(--bf-on-brand, #ffffff);
+  --color-primary-fixed: #ffdbce;
+  --color-primary-fixed-dim: #ffb599;
+  --color-on-primary-fixed: #370e00;
+  --color-on-primary-fixed-variant: #7f2b00;
+  --color-inverse-primary: #ffb599;
+
+  --color-secondary: #565e74;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #dae2fd;
+  --color-on-secondary-container: #5c647a;
+  --color-secondary-fixed: #dae2fd;
+  --color-secondary-fixed-dim: #bec6e0;
+  --color-on-secondary-fixed: #131b2e;
+  --color-on-secondary-fixed-variant: #3f465c;
+
+  --color-tertiary: #994100;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #c05400;
+  --color-on-tertiary-container: #fffbff;
+  --color-tertiary-fixed: #ffdbca;
+  --color-tertiary-fixed-dim: #ffb690;
+  --color-on-tertiary-fixed: #341100;
+  --color-on-tertiary-fixed-variant: #783200;
+
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+
+  --color-background: #fff8f6;
+  --color-on-background: #261813;
+
+  /* Slate scaffolding */
+  --color-slate-50: #f8fafc;
+  --color-slate-100: #f1f5f9;
+  --color-slate-200: #e2e8f0;
+  --color-slate-300: #cbd5e1;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #64748b;
+  --color-slate-600: #475569;
+  --color-slate-700: #334155;
+  --color-slate-800: #1e293b;
+  --color-slate-900: #0f172a;
+  --color-slate-950: #020617;
+
+  /* Ember accent */
+  --color-ember-50: #fff7ed;
+  --color-ember-100: #ffedd5;
+  --color-ember-500: #f97316;
+  --color-ember-600: #ea580c;
+  --color-ember-700: #c2410c;
+
+  /* Operational status logic */
+  --color-status-success: #16a34a;
+  --color-status-success-bg: #f0fdf4;
+  --color-status-warning: #d97706;
+  --color-status-warning-bg: #fffbeb;
+  --color-status-critical: #dc2626;
+  --color-status-critical-bg: #fef2f2;
+  --color-status-info: #2563eb;
+  --color-status-info-bg: #eff6ff;
+
+  /* KDS functional anchors */
+  --color-kds-prep: #d97706;
+  --color-kds-ready: #16a34a;
+  --color-kds-rush: #dc2626;
+
+  /* ---------------------------------------------------------------- Shadows */
+  --shadow-e1: 0 1px 3px 0 rgb(15 23 42 / 0.04), 0 1px 2px -1px rgb(15 23 42 / 0.04);
+  --shadow-e2: 0 4px 6px -1px rgb(15 23 42 / 0.07), 0 2px 4px -2px rgb(15 23 42 / 0.05);
+  --shadow-e3: 0 20px 25px -5px rgb(15 23 42 / 0.1), 0 8px 10px -6px rgb(15 23 42 / 0.05);
+}
+
+/* ========================================================================== */
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-background);
+    color: var(--color-on-surface);
+    font-family: var(--font-body-md);
+    font-size: var(--text-body-md);
+    line-height: var(--text-body-md--line-height);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overscroll-behavior-y: none;
+  }
+
+  /* Tabular figures everywhere numbers stream in (KDS, bills, analytics). */
+  .tabular,
+  table,
+  [data-numeric] {
+    font-feature-settings: 'tnum' on, 'cv05' on;
+    font-variant-numeric: tabular-nums;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: inherit;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  p {
+    margin: 0;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /* Material Symbols sizing/optical default. */
+  .material-symbols-outlined {
+    font-variation-settings:
+      'FILL' 0,
+      'wght' 400,
+      'GRAD' 0,
+      'opsz' 24;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    flex-shrink: 0;
+  }
+
+  .icon-filled {
+    font-variation-settings:
+      'FILL' 1,
+      'wght' 400,
+      'GRAD' 0,
+      'opsz' 24;
+  }
+}
+
+/* ========================================================================== */
+@layer utilities {
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  /* Thin, unobtrusive scrollbars for dense operational panes. */
+  .scroll-slim {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-slate-300) transparent;
+  }
+  .scroll-slim::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scroll-slim::-webkit-scrollbar-thumb {
+    background: var(--color-slate-300);
+    border-radius: 9999px;
+  }
+  .scroll-slim::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .hairline {
+    border: 1px solid var(--color-slate-200);
+  }
+
+  /* Ambient brand glow used behind hero + dashboard canvases. */
+  .ambient-glow::before,
+  .ambient-glow::after {
+    content: '';
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(64px);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .ambient-glow::before {
+    width: 24rem;
+    height: 24rem;
+    top: -8rem;
+    right: 3rem;
+    background: color-mix(in srgb, var(--color-primary) 18%, transparent);
+  }
+  .ambient-glow::after {
+    width: 20rem;
+    height: 20rem;
+    top: 24rem;
+    left: -5rem;
+    background: color-mix(in srgb, var(--color-tertiary) 14%, transparent);
+  }
+}
+
+/* ========================================================================== */
+/* Motion — subtle only (design.md §38)                                      */
+@keyframes bf-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes bf-slide-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes bf-slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes bf-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.anim-fade-up {
+  animation: bf-fade-up 0.22s ease-out both;
+}
+.anim-drawer {
+  animation: bf-slide-in-right 0.26s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+.anim-sheet {
+  animation: bf-slide-up 0.26s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Print sheet for QR codes (design.md §11 — printable QR sheet). */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .print-sheet {
+    background: #fff !important;
+  }
+  body {
+    background: #fff;
+  }
+}

@@ -1,0 +1,3 @@
+[functions.allocate-order-number]
+schedule = []
+argon2_hashing = false
