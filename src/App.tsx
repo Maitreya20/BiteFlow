@@ -1,8 +1,9 @@
 import { useEffect } from 'react'
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AppStoreProvider, useAppStore } from '@/store/AppStore'
 import { CartProvider } from '@/store/CartStore'
 import { ToastProvider } from '@/components/ui'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { MarketingLayout } from '@/components/layout/MarketingLayout'
 import { DashboardShell } from '@/components/layout/DashboardShell'
 import { CustomerShell } from '@/components/layout/CustomerShell'
@@ -91,7 +92,7 @@ export default function App() {
           <ScrollToTop />
           <Routes>
             {/* ---------------------------------------------------- Public */}
-            <Route element={<MarketingLayout />}>
+            <Route element={<ErrorBoundary><MarketingLayout /></ErrorBoundary>}>
               <Route index element={<LandingPage />} />
               <Route path="/features" element={<FeaturesPage />} />
               <Route path="/pricing" element={<PricingPage />} />
@@ -112,7 +113,9 @@ export default function App() {
               path="/app"
               element={
                 <Protected>
-                  <DashboardShell variant="app" />
+                  <ErrorBoundary>
+                    <DashboardShell variant="app" />
+                  </ErrorBoundary>
                 </Protected>
               }
             >
@@ -138,7 +141,9 @@ export default function App() {
               path="/admin"
               element={
                 <Protected>
-                  <DashboardShell variant="admin" />
+                  <ErrorBoundary>
+                    <DashboardShell variant="admin" />
+                  </ErrorBoundary>
                 </Protected>
               }
             >
@@ -148,10 +153,8 @@ export default function App() {
               <Route path="subscriptions" element={<AdminSubscriptions />} />
               <Route path="analytics" element={<AdminAnalytics />} />
               <Route path="audit" element={<AdminAudit />} />
-            </Route>
-
-            {/* -------------------------------------------- Customer (QR) */}
-            <Route path="/r/:slug" element={<CustomerShell />}>
+            </Route>            {/*-------------------------------------------- Customer (QR) */}
+            <Route path="/r/:slug" element={<ErrorBoundary><CustomerShell /></ErrorBoundary>}>
               <Route index element={<CustomerHome />} />
               <Route path="menu" element={<CustomerMenu />} />
               <Route path="menu/:itemId" element={<DishDetail />} />
@@ -161,6 +164,46 @@ export default function App() {
               <Route path="bill" element={<BillPage />} />
               <Route path="profile" element={<CustomerProfile />} />
             </Route>
+
+            {/* ---- Empty state --- */}
+            <Route
+              path="/empty"
+              element={
+                <div className="flex min-h-screen items-center justify-center bg-background p-space-md">
+                  <div className="flex max-w-md flex-col items-center gap-space-lg rounded-2xl border border-surface-container-low bg-surface-container p-space-xl text-center shadow-sm">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-on-primary text-primary shadow-sm">
+                      <svg
+                        className="h-7 w-7"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="1.8"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path d="M3 12h18M12 3v18" />
+                      </svg>
+                    </div>
+                    <h2 className="text-display-xs font-display-semibold tracking-tight text-on-background">
+                      No restaurant yet
+                    </h2>
+                    <p className="flex text-body-sm text-on-surface-variant">
+                      You don't have a restaurant set up. Create one in a few steps.
+                    </p>
+                    <Link
+                      className="inline-flex h-10 w-full items-center justify-center gap-space-sm rounded-xl bg-primary px-space-lg font-body-medium text-on-primary shadow-sm transition-shadow hover:shadow-md"
+                      to="/onboarding/1"
+                    >
+                      Create a restaurant
+                      <svg className="h-4 w-4 shrink-0" fill="none" height="16" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+                    </Link>
+                  </div>
+                </div>
+              }
+            />
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

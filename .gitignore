@@ -8,3 +8,13 @@ dist-ssr
 .DS_Store
 .vite
 *.tsbuildinfo
+
+# Dev-time artifacts
+_snapshot_extract/
+work-snapshot.patch
+work-snapshot.zip
+supabase/.temp/
+
+# IDE / OS
+Thumbs.db
+*.log

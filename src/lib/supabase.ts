@@ -15,8 +15,14 @@ const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
 const forceDemo = String(import.meta.env.VITE_DEMO_MODE ?? '').toLowerCase() === 'true'
 
+// Treat placeholder/example values as "not configured" so a checked-in
+// .env that wasn't filled in still falls back to demo mode cleanly.
 const hasCredentials =
-  Boolean(url && anonKey) && !url!.includes('your-project-ref') && !anonKey!.includes('your-anon')
+  Boolean(url && anonKey) &&
+  !url!.includes('your-project-ref') &&
+  !url!.includes('your-project-url') &&
+  !anonKey!.includes('your-anon') &&
+  anonKey!.length > 50
 
 /** True when real Supabase credentials are wired up. */
 export const isSupabaseConfigured = hasCredentials && !forceDemo

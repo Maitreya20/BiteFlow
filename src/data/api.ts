@@ -1127,6 +1127,9 @@ export async function placeOrder(input: PlaceOrderInput): Promise<Order> {
     cancelledReason: null,
   }
 
+  // In live mode we commit to Postgres first; only when that succeeds do we
+  // apply the order to the in-memory/demo store. If the remote write fails we
+  // throw before touching local state, so the two backends never drift apart.
   if (MODE === 'live') {
     const sb = requireSupabase()
     const { data: inserted, error } = await sb
@@ -1155,10 +1158,11 @@ export async function placeOrder(input: PlaceOrderInput): Promise<Order> {
       .select('order_number')
       .single()
     if (error) throw new Error(error.message)
-    // The trigger may have overwritten order_number with the DB-allocated value.
+    // The BEFORE INSERT trigger may have overwritten order_number with the
+    // DB-allocated BF number — read it back so the local order matches.
     order.orderNumber = (inserted as Record<string, unknown>).order_number as string
 
-    await sb.from('order_items').insert(
+    const { error: itemsError } = await sb.from('order_items').insert(
       items.map((i) => ({
         id: i.id,
         order_id: i.orderId,
@@ -1172,6 +1176,7 @@ export async function placeOrder(input: PlaceOrderInput): Promise<Order> {
         line_total: i.lineTotal,
       })),
     )
+    if (itemsError) throw new Error(itemsError.message)
   }
 
   db.orders.unshift(order)
