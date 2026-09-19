@@ -114,6 +114,83 @@ Force demo mode even with credentials present by setting `VITE_DEMO_MODE=true`.
 
 ---
 
+## Deploy
+
+The `dist/` folder produced by `npm run build` is a fully static site. Drop it on
+any static host. Two SPA-fallback configs are included so client-side routes don't
+404 on refresh:
+
+| Host | File |
+| --- | --- |
+| Vercel | `vercel.json` (rewrites all routes to `/index.html`) |
+| Netlify | `public/_redirects` (same rewrite rule) |
+
+### Vercel (recommended)
+
+1. Push this repo to GitHub.
+2. In the [Vercel dashboard](https://vercel.com) click **Add New → Project**,
+   import the repo, and leave all defaults. Vercel picks up `vercel.json` and
+   auto-deploys on every push to `main`.
+3. Add your Supabase env vars under *Project Settings → Environment Variables*:
+   `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_PUBLIC_SITE_URL`.
+4. Redeploy once the vars are set (or set them as *Production* vars and the
+   initial deploy will include them).
+
+#### Quick deploy without the dashboard
+
+If you prefer the CLI, install it once and run:
+
+```bash
+npm i -g vercel
+vercel login              # browser flow — one time
+vercel                    # preview deployment
+vercel --prod             # production deployment
+```
+
+The preview URL is printed at the end of the deploy; use it to share a live
+instance before merging.
+
+### Netlify
+
+```bash
+npm run build
+# drag the `dist/` folder onto Netlify Drop, or connect the repo and Netlify
+# picks up public/_redirects automatically.
+```
+
+### Any static host (S3, Cloudflare Pages, GitHub Pages...)
+
+Serve `dist/` as static files and configure the host to return `index.html` for
+any route that doesn't match a file. The exact setting name differs by host:
+
+| Host | Setting |
+| --- | --- |
+| Cloudflare Pages | *Functions → SPA fallback* or `_redirects` file in `dist/` |
+| GitHub Pages | no config needed for single-page apps if you use a custom 404 page that redirects to `index.html` |
+| S3 + CloudFront | *Error pages* → set `404.html` to `index.html` with a 200 response |
+
+### Environment variables
+
+Set these on the host's environment/UI. They are **build-time** variables, so set
+them before building (or rebuild after changing them).
+
+| Variable | Required? | Notes |
+| --- | --- | --- |
+| `VITE_SUPABASE_URL` | no (demo mode without it) | Supabase project URL |
+| `VITE_SUPABASE_ANON_KEY` | no (demo mode without it) | Supabase anon/public key |
+| `VITE_PUBLIC_SITE_URL` | yes for live QR links | The public URL of the deployed site, e.g. `https://your-tenant.vercel.app` — used to build QR links |
+| `VITE_DEMO_MODE` | no (defaults to `true` when no Supabase creds) | Set to `false` to force live mode when creds are present |
+
+### Demo mode on deploy
+
+The app runs **fully in demo mode** with no Supabase credentials — the bundled
+seed dataset is served from `localStorage`. This is ideal for a preview deploy
+that requires zero backend setup: users can sign in with any email, browse the
+three seeded tenants (`spice-route`, `urban-bean-cafe`, `the-green-bowl`), and
+every screen is populated.
+
+---
+
 ## Scripts
 
 ```bash
@@ -121,6 +198,7 @@ npm run dev         # dev server
 npm run typecheck   # tsc --noEmit
 npm run build       # typecheck + production bundle
 npm run preview     # serve the production build
+npm test            # run smoke tests
 ```
 
 ## Layout
