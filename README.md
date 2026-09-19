@@ -1,76 +1,131 @@
-# BiteFlow — Restaurant OS prototype
+# BiteFlow — Restaurant OS
 
-A working prototype of the BiteFlow platform described in [`prd.md`](./prd.md) and
-[`design.md`](./design.md), built on the **Hospitality Kinetic** design system in
-[`hospitality_kinetic/DESIGN.md`](./hospitality_kinetic/DESIGN.md).
+A working prototype of the BiteFlow platform — an end-to-end restaurant operating
+system with a public marketing site, tenant onboarding, a role-aware restaurant app,
+customer-facing QR ordering, and a super-admin console for managing tenants, plans,
+billing and audit.
 
-Vite + React + TypeScript + Tailwind v4 + Supabase.
+Built as a single Vite + React 18 + TypeScript + Tailwind CSS v4 single-page app on
+top of Supabase (Postgres + Auth + Realtime, with RLS enforcing tenant isolation).
 
 ---
 
-## What's in here
+## What BiteFlow is, in one breath
 
-| Surface | Routes | Notes |
+BiteFlow is a SaaS restaurant platform where each tenant (a restaurant or café) gets
+a fully branded customer experience — menu, pricing, floor plan, orders, reservations
+and billing — while the platform owner sees the whole business: tenants, subscriptions,
+revenue, analytics and audit.
+
+The same codebase renders every surface:
+
+| Surface | Routes | Purpose |
 | --- | --- | --- |
 | Marketing site | `/`, `/features`, `/pricing`, `/demo`, `/about`, `/contact` | Position the product, book a demo |
-| Auth | `/login`, `/signup` | Supabase email + password |
+| Auth | `/login`, `/signup` | Supabase email + password auth |
 | Onboarding | `/onboarding/1` … `/onboarding/8` | Profile → branding → plan → menu → floor plan → launch |
-| Restaurant app | `/app/dashboard`, `/app/orders`, `/app/kitchen`, `/app/tables`, `/app/tables/qr`, `/app/reservations`, `/app/menu`, `/app/inventory`, `/app/customers`, `/app/employees`, `/app/analytics`, `/app/billing`, `/app/branding`, `/app/settings` | Role-aware nav (RBAC per `prd.md` §19) |
+| Restaurant app | `/app/dashboard`, `/app/orders`, `/app/kitchen`, `/app/tables`, `/app/tables/qr`, `/app/reservations`, `/app/menu`, `/app/inventory`, `/app/customers`, `/app/employees`, `/app/analytics`, `/app/billing`, `/app/branding`, `/app/settings` | Role-aware workspace (RBAC per `prd.md`) |
 | Customer QR flow | `/r/:slug`, `/r/:slug/menu`, `/r/:slug/menu/:itemId`, `/r/:slug/cart`, `/r/:slug/orders`, `/r/:slug/order/:orderId`, `/r/:slug/bill`, `/r/:slug/profile` | Mobile-first, white-labelled per tenant |
-| Super admin | `/admin`, `/admin/tenants`, `/admin/plans`, `/admin/subscriptions`, `/admin/analytics`, `/admin/audit` | Platform-wide tenants, pricing, revenue and audit |
+| Super admin | `/admin`, `/admin/tenants`, `/admin/plans`, `/admin/subscriptions`, `/admin/analytics`, `/admin/audit` | Platform-wide tenants, pricing, revenue, audit |
 
-Try it with the seeded tenants: **`/r/spice-route`** (restaurant), **`/r/urban-bean-cafe`**
-(café) and **`/r/the-green-bowl`** (health bowl bar).
+Seeded demo tenants you can open right away:
+
+- `/r/spice-route` — full restaurant
+- `/r/urban-bean-cafe` — café
+- `/r/the-green-bowl` — health bowl bar
 
 ---
 
-## Run it
+## Why it matters
+
+BiteFlow is a complete, opinionated answer to a real operational problem: a restaurant
+should not need five separate tools to take a table, send a ticket to the kitchen,
+capture a special request, run a reservation, invoice a table and brand its customer
+menu. Every role inside the restaurant sees the same truth from a different angle:
+
+- Guests scan a QR code, browse the white-labelled menu, order, pay and track their
+  order — without waiting on a server.
+- FOH sees live tables, orders in flight, reservations and kitchen load.
+- Kitchen sees tickets and prep stages.
+- Managers and owners see the dashboard, inventory, customers, employees, billing and
+  branding.
+- Platform admins see all tenants, plans, subscriptions, revenue and an append-only
+  audit trail.
+
+It is also built so the prototype runs without any backend setup — a bundled demo
+dataset backs every screen — and then lifts into a real Supabase project with one SQL
+file and two env vars.
+
+---
+
+## What's inside
+
+- **Design system**: Hospitality Kinetic, documented in [`design.md`](./design.md).
+- **API surface**: one abstraction in `src/data/api.ts` with two interchangeable
+  backends — a fully offline demo backed by the bundled seed dataset, and a live
+  Supabase backend using RLS and realtime.
+- **Tenant isolation**: every tenant-scoped read/write is filtered by organization and
+  enforced server-side by RLS in `supabase/schema.sql`.
+- **Demo dataset**: full tenant, menu, floor plan, orders, reservations, inventory,
+  customers, invoices, notifications and audit history, generated in
+  `src/data/seed.ts` and mirrored in `supabase/seed.sql`.
+- **Static deploy output**: `npm run build` emits a fully static `dist/` that runs on
+  any static host, with SPA-fallback rewrites included for Vercel and Netlify.
+
+---
+
+## Quick start
 
 ```bash
 npm install
-cp .env.example .env     # optional — skip for demo mode
-npm run dev              # http://localhost:5173
+cp .env.example .env      # optional — skip entirely for demo mode
+npm run dev               # http://localhost:5173
 ```
 
-### Two modes
+That's enough to open the three seeded tenants and walk every customer QR flow. No
+Supabase project is required for the demo.
 
-`src/data/api.ts` exposes a single API surface with two interchangeable backends:
+---
 
-* **demo** (default) — no credentials required. The bundled dataset in
+## Two modes
+
+`src/data/api.ts` exposes a single API surface behind two backends:
+
+- **Demo (default)** — no credentials required. The bundled dataset in
   `src/data/seed.ts` backs every screen and persists to `localStorage`, so the
-  golden-path demo works offline. Sign in with any email + password.
-* **live** — set the two Supabase variables below and every read/write goes to
-  Postgres through RLS. Realtime subscribes to `orders`, `restaurant_tables`,
+  golden-path demo works offline. Sign in with any email and password.
+- **Live** — set the two Supabase variables below and every read/write goes to Postgres
+  through RLS. Realtime subscribes to `orders`, `restaurant_tables`,
   `service_requests` and `notifications`.
 
-Force demo mode even with credentials present by setting `VITE_DEMO_MODE=true`.
+Force demo mode even when credentials are present by setting `VITE_DEMO_MODE=true`.
 
 ---
 
 ## Supabase setup
 
-1. **Create a project** at [supabase.com](https://supabase.com) (choose a region
-   close to your users — `ap-south-1` for India).
+1. **Create a project** at [supabase.com](https://supabase.com). Pick a region close to
+   your users (for India, `ap-south-1`).
 
-2. **Apply the schema.** Open *SQL Editor* → *New query*, paste the contents of
-   [`supabase/schema.sql`](./supabase/schema.sql) and run it. That creates every
-   table, the `is_org_member` / `is_super_admin` / `is_public_tenant` helpers,
-   all RLS policies (including anon access for the QR menu), the profile trigger,
-   the table-sync trigger and the realtime publication.
+2. **Apply the schema.** In *SQL Editor*, paste the contents of
+   [`supabase/schema.sql`](./supabase/schema.sql) and run it. That creates every table,
+   the `is_org_member` / `is_super_admin` / `is_public_tenant` helpers, all RLS policies
+   (including anon access for the QR menu), the profile trigger, the table-sync trigger
+   and the realtime publication.
 
-3. **Seed the demo tenant** (optional but recommended). Run
-   [`supabase/seed.sql`](./supabase/seed.sql) the same way. It creates *Spice
-   Route* with a full menu, floor plan, live and completed orders, reservations,
-   inventory, customers, invoices, notifications and audit history.
+3. **Seed the demo tenant (optional but recommended).** Run
+   [`supabase/seed.sql`](./supabase/seed.sql) the same way. It creates *Spice Route* with
+   a full menu, floor plan, live and completed orders, reservations, inventory, customers,
+   invoices, notifications and audit history.
 
-4. **Grab your API keys.** *Project Settings* → *API* → copy:
+4. **Grab your API keys.** *Project Settings → API* → copy:
 
    | Key | Goes into |
    | --- | --- |
    | Project URL | `VITE_SUPABASE_URL` |
    | `anon` `public` key | `VITE_SUPABASE_ANON_KEY` |
 
-   Put them in `.env` in the project root:
+   Put them in `.env` at the project root:
 
    ```bash
    VITE_SUPABASE_URL=https://xxxxxxxxxxxx.supabase.co
@@ -78,9 +133,8 @@ Force demo mode even with credentials present by setting `VITE_DEMO_MODE=true`.
    VITE_PUBLIC_SITE_URL=http://localhost:5173   # used to build QR links
    ```
 
-5. **Create your account.** Sign up in the app (or *Authentication* → *Users* →
-   *Add user*), then run this once so your login owns the demo tenant and can
-   reach `/admin`:
+5. **Create your first account.** Sign up in the app (or *Authentication → Users → Add
+   user*), then run this once so your login owns the demo tenant and can reach `/admin`:
 
    ```sql
    insert into public.memberships (organization_id, user_id, role, status, shift)
@@ -90,24 +144,24 @@ Force demo mode even with credentials present by setting `VITE_DEMO_MODE=true`.
    on conflict do nothing;
    ```
 
-   Swap `'super_admin'` for `'owner'` (or `'manager'`, `'chef'`, `'waiter'`,
-   `'cashier'`) to preview a role-scoped workspace.
+   Swap `'super_admin'` for `'owner'`, `'manager'`, `'chef'`, `'waiter'` or `'cashier'`
+   to preview a role-scoped workspace.
 
-6. **Restart the dev server** — Vite only reads `.env` on boot.
+6. **Restart the dev server.** Vite only reads `.env` on boot.
 
 ### Notes
 
-* `memberships.role` drives the sidebar and every write guard (`ROLE_CAPABILITIES`
-  in `src/lib/types.ts`); RLS is the source of truth server-side.
-* Guest ordering runs on the `anon` key: the QR flow can read the menu and insert
-  orders only while the tenant's `subscription_status` is `active` or `trialing`.
-* `audit_logs` is append-only — no `UPDATE`/`DELETE` policy is created.
+- `memberships.role` drives the sidebar and every write guard (`ROLE_CAPABILITIES` in
+  `src/lib/types.ts`); RLS is the source of truth server-side.
+- Guest ordering runs on the `anon` key: the QR flow reads the menu and inserts orders
+  only while the tenant's `subscription_status` is `active` or `trialing`.
+- `audit_logs` is append-only — there is no `UPDATE` / `DELETE` policy.
 
 ### Troubleshooting
 
 | Error | Cause | Fix |
 | --- | --- | --- |
-| `42P01: relation public.memberships does not exist` while creating functions | An earlier revision of `schema.sql` declared the SQL helper functions *before* the tables they read — Postgres validates SQL function bodies at create time, so the whole file rolled back. | Fixed: tables now come first and the script sets `check_function_bodies = off`. Re-run the current `schema.sql`. |
+| `42P01: relation public.memberships does not exist` while creating functions | An earlier revision of `schema.sql` declared SQL helpers before the tables they read — Postgres validates function bodies at create time. | Tables now come first and the script sets `check_function_bodies = off`. Re-run the current `schema.sql`. |
 | `42P01: relation public.organizations does not exist` from the seed | `seed.sql` ran before `schema.sql`, or `schema.sql` aborted part-way. | Run `schema.sql` to completion first; the seed now aborts with a clear message instead. |
 | `PGRST205: Could not find the table public.organizations` from the app | PostgREST has not picked up the new tables, or the schema was never applied. | Run `schema.sql`, then reload the API cache from *Project Settings → API → Reload schema*. |
 | Login works but every screen is empty and the console shows RLS errors | Your user has no row in `memberships`. | Run the membership snippet in step 5 above. |
@@ -199,11 +253,17 @@ npm run typecheck   # tsc --noEmit
 npm run build       # typecheck + production bundle
 npm run preview     # serve the production build
 npm test            # run smoke tests
+npm run test:watch  # run tests in watch mode
 ```
 
-## Layout
+CI runs `npm ci`, `npm run typecheck`, `npm run test` and `npm run build` on Node 20 for
+every push and pull request to `main` (`.github/workflows/ci.yml`).
 
-```
+---
+
+## Project layout
+
+```text
 src/
   components/     UI kit, layout shells, QR + guest-menu preview
   data/           api.ts (demo ⇄ Supabase), seed.ts, metrics.ts
@@ -214,3 +274,19 @@ supabase/
   schema.sql      tables, RLS, triggers, realtime
   seed.sql        demo tenant
 ```
+
+Top-level config: `package.json`, `vite.config.ts`, `tsconfig.json`, `vitest.config.ts`,
+`.env.example`.
+
+---
+
+## License
+
+This project is a prototype. Treat the code, schema and seed data as illustrative unless
+otherwise licensed.
+
+---
+
+## Author
+
+Maitreya20 — [github.com/Maitreya20/BiteFlow](https://github.com/Maitreya20/BiteFlow)

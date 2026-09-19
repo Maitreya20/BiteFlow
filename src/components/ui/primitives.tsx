@@ -454,17 +454,21 @@ export function SegmentedControl<T extends string>({
   onChange,
   options,
   size = 'md',
+  label,
   className,
 }: {
   value: T
   onChange: (value: T) => void
   options: { value: T; label: string; icon?: string; count?: number }[]
   size?: 'sm' | 'md'
+  /** Accessible name for the tab list. */
+  label?: string
   className?: string
 }) {
   return (
     <div
       role="tablist"
+      aria-label={label}
       className={cn(
         'inline-flex items-center gap-1 rounded-xl bg-surface-container-low p-1',
         className,

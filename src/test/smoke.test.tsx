@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
 import { AppStoreProvider } from '@/store/AppStore'
 import { CartProvider, useCart } from '@/store/CartStore'
-import { Button } from '@/components/ui'
+import { Button, ToastProvider } from '@/components/ui'
 import { DashboardShell } from '@/components/layout/DashboardShell'
 import { GuestMenuPreview } from '@/components/GuestMenuPreview'
 import type { Branding, MenuItem } from '@/lib/types'
@@ -11,11 +11,14 @@ import type { Branding, MenuItem } from '@/lib/types'
 describe('smoke tests', () => {
   it('renders the dashboard shell in demo mode without crashing', () => {
     // In demo mode the store reads from the bundled seed dataset. Mounting the
-    // dashboard shell verifies the provider + layout tree stays coherent.
+    // dashboard shell verifies the provider + layout tree stays coherent. The
+    // shell also renders the demo role switcher, which reads the toast context.
     render(
       <BrowserRouter>
         <AppStoreProvider>
-          <DashboardShell variant="app" />
+          <ToastProvider>
+            <DashboardShell variant="app" />
+          </ToastProvider>
         </AppStoreProvider>
       </BrowserRouter>,
     )

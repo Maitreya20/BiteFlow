@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import { cn } from '@/lib/cn'
 import { Avatar, Badge, Button, Icon } from '@/components/ui'
 import { APP_NAV, ADMIN_NAV, type BadgeKey, type NavGroup } from './nav'
+import { DemoRoleSwitcher } from './DemoRoleSwitcher'
 import { useAppStore } from '@/store/AppStore'
 import { PLANS } from '@/lib/plans'
 import { relativeTime } from '@/lib/format'
@@ -463,6 +464,9 @@ export function DashboardShell({
               </Button>
             </Link>
 
+            {/* Demo-only shortcut between the owner and super-admin sessions. */}
+            <DemoRoleSwitcher />
+
             <Dropdown
               width={340}
               trigger={({ toggle }) => (
@@ -562,6 +566,7 @@ export function DashboardShell({
                   </Link>
                 ) : null}
               </div>
+              <DemoRoleSwitcher presentation="menu" />
               <button
                 type="button"
                 onClick={() => void signOut().then(() => navigate('/'))}

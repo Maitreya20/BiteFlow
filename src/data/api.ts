@@ -723,19 +723,10 @@ export async function createOrganization(input: {
     if (error) throw new Error(error.message)
     const created = mapOrganization(data as Record<string, unknown>)
     org.id = created.id
-    // Seed the order number counter for this new tenant so the first order
-    // starts at BF-1200. The counter row is created by next_order_number()
-    // on the first call, but seeding it here makes the intent explicit.
-    if (MODE === 'live') {
-      try {
-        await sb.from('order_number_counters').upsert({
-          organization_id: org.id,
-          last_number: 1199,
-        })
-      } catch (_e) {
-        // ignore — counter row may already exist
-      }
-    }
+    // The order-number counter row is created lazily by next_order_number() on
+    // the tenant's first order (starting at BF-1200). It is deliberately not
+    // seeded from the client: order_number_counters is RLS-protected and only
+    // its SECURITY DEFINER helpers may write to it.
     if (session) {
       await sb
         .from('memberships')
