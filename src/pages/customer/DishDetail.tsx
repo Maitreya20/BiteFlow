@@ -110,7 +110,8 @@ export function DishDetail() {
   }
 
   return (
-    <div className="flex flex-col pb-32">
+    /* Bottom padding clears the fixed bottom nav (~64px) plus the sticky CTA bar. */
+    <div className="flex flex-col pb-52">
       {/* ------------------------------------------------------- hero image */}
       <div
         className="relative flex h-56 items-center justify-center text-[84px]"
@@ -277,7 +278,9 @@ export function DishDetail() {
       </div>
 
       {/* ------------------------------------------------------ sticky CTA */}
-      <div className="pb-safe fixed bottom-0 left-1/2 z-30 w-full max-w-[560px] -translate-x-1/2 border-t border-slate-200 bg-surface-container-lowest/95 px-space-lg py-space-md backdrop-blur-xl">
+      {/* Sits above the fixed bottom nav — at bottom-0 the nav (z-40) overlays this
+          bar (z-30) and steals every tap on the button. */}
+      <div className="pb-safe fixed bottom-[68px] left-1/2 z-30 w-full max-w-[560px] -translate-x-1/2 rounded-t-2xl border-t border-slate-200 bg-surface-container-lowest/95 px-space-lg py-space-md shadow-e2 backdrop-blur-xl">
         <div className="mb-space-sm flex items-center justify-between">
           <span className="font-label-sm text-label-sm text-on-surface-variant">
             {cart.count > 0 ? `${cart.count} already in your order` : 'Nothing in your order yet'}

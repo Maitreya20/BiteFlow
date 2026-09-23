@@ -287,7 +287,9 @@ export function CartPage() {
       )}
 
       {/* -------------------------------------------------------- sticky CTA */}
-      <div className="pb-safe fixed bottom-0 left-1/2 z-30 w-full max-w-[560px] -translate-x-1/2 border-t border-slate-200 bg-surface-container-lowest/95 px-space-lg py-space-md backdrop-blur-xl">
+      {/* Sits above the fixed bottom nav — at bottom-0 the nav (z-40) overlays this
+          bar (z-30) and steals every tap on the button. */}
+      <div className="pb-safe fixed bottom-[68px] left-1/2 z-30 w-full max-w-[560px] -translate-x-1/2 rounded-t-2xl border-t border-slate-200 bg-surface-container-lowest/95 px-space-lg py-space-md shadow-e2 backdrop-blur-xl">
         {!table && channel === 'dine_in' && (
           <p className="mb-space-xs text-center font-label-xs text-label-xs text-status-warning">
             No table detected — scan your table QR or switch to takeaway.
