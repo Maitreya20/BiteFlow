@@ -167,6 +167,44 @@ function emit() {
   listeners.forEach((l) => l())
 }
 
+/* ----------------------------------------------------------------------------
+   Cross-tab sync (demo mode).
+
+   Demo state lives in localStorage, so two tabs each hold their own in-memory
+   copy and a write in one is invisible to the other until a reload — a guest
+   order placed in one window never showed up on the restaurant dashboard in
+   another. Browsers fire a `storage` event in every *other* tab whenever
+   localStorage changes, so the dataset key doubles as the sync bus: reload the
+   copy, re-apply the session, notify React. Live mode does not need this (each
+   tab holds its own Supabase session and Postgres changes arrive over the
+   realtime socket), and tabs of different modes are a non-case because MODE is
+   fixed at build time.
+   -------------------------------------------------------------------------- */
+function handleStorageSync(event: StorageEvent): void {
+  if (event.key !== DB_KEY && event.key !== SESSION_KEY && event.key !== IMPERSONATION_KEY) return
+  if (typeof localStorage === 'undefined') return
+
+  try {
+    const raw = localStorage.getItem(DB_KEY)
+    if (raw) db = JSON.parse(raw) as DemoDatabase
+  } catch {
+    /* a torn write in another tab — keep the current copy */
+  }
+
+  // The session and any impersonation are stored under the same rules as the
+  // dataset: whoever wrote them (sign-in, role switch) expects the other tabs
+  // to follow. Reload them wholesale and let emit() fan out.
+  session = readStoredSession()
+  impersonation = readStoredImpersonation()?.state ?? null
+  impersonationActor = null // the actor's tokens are tab-local by design
+
+  emit()
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', handleStorageSync)
+}
+
 /** Subscribe to dataset/session changes (realtime stand-in for demo mode). */
 export function subscribe(listener: () => void): () => void {
   listeners.add(listener)
@@ -2015,7 +2053,19 @@ export function subscribeRealtime(organizationId: string): () => void {
       },
     )
   })
-  channel.subscribe()
+  // A socket that dies silently is the failure mode nobody can debug after the
+  // fact: the dashboard just stops updating with nothing in the console. Track
+  // the status, and pull a full snapshot on reconnect — events missed while the
+  // socket was down are gone forever, but a snapshot is always current.
+  channel.subscribe((status) => {
+    if (status === 'SUBSCRIBED') {
+      console.info(`[biteflow] realtime connected for org ${organizationId}`)
+    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+      console.warn(`[biteflow] realtime ${status} — realtime updates are degraded until reconnect`)
+    } else if (status === 'CLOSED') {
+      void refresh()
+    }
+  })
   return () => {
     void supabase?.removeChannel(channel)
   }
