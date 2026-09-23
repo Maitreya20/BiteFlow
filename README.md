@@ -93,10 +93,13 @@ Supabase project is required for the demo.
 
 - **Demo (default)** — no credentials required. The bundled dataset in
   `src/data/seed.ts` backs every screen and persists to `localStorage`, so the
-  golden-path demo works offline. Sign in with any email and password.
+  golden-path demo works offline. Sign in with any email and password. State is
+  synced **across browser tabs** — see [Demo mode on deploy](#demo-mode-on-deploy).
 - **Live** — set the two Supabase variables below and every read/write goes to Postgres
   through RLS. Realtime subscribes to `orders`, `restaurant_tables`,
-  `service_requests` and `notifications`.
+  `service_requests` and `notifications` (socket status is logged to the
+  console, and a full snapshot is re-pulled on reconnect so events missed
+  during an outage are not lost).
 
 Force demo mode even when credentials are present by setting `VITE_DEMO_MODE=true`.
 
@@ -243,6 +246,25 @@ that requires zero backend setup: users can sign in with any email, browse the
 three seeded tenants (`spice-route`, `urban-bean-cafe`, `the-green-bowl`), and
 every screen is populated.
 
+#### Cross-tab sync
+
+Demo state used to be per-tab: an order placed through the guest flow in one
+window was invisible to a dashboard open in another until a full reload. It is
+now synced — whenever a tab writes the dataset, session or impersonation state
+to `localStorage`, every *other* tab receives the browser's `storage` event,
+reloads its in-memory copy and re-renders. In practice: put the restaurant
+dashboard and the guest menu in two side-by-side windows and orders appear on
+the dashboard the moment they are placed.
+
+Two boundaries worth knowing:
+
+- Sync is per **browser profile**, because that is what `localStorage` scopes
+  to — separate devices (or a normal vs. incognito window) do not see each
+  other. Multi-device ordering needs live mode.
+- A tab whose `localStorage` write raced another's can at worst hand a torn
+  JSON blob to its peers; those keep their current copy rather than crashing
+  (pinned by `src/test/cross-tab-sync.test.tsx`).
+
 ---
 
 ## Scripts
@@ -255,6 +277,23 @@ npm run preview     # serve the production build
 npm test            # run smoke tests
 npm run test:watch  # run tests in watch mode
 ```
+
+#### Realtime probe
+
+`scripts/realtime-probe.mjs` verifies the live-mode realtime path end to end
+against a real project: it subscribes to `orders` exactly the way the dashboard
+does, inserts an order through the anon REST path, and asserts the event
+arrives (then deletes it). Run it after wiring up Supabase, or whenever the
+dashboard seems to have stopped updating:
+
+```bash
+node scripts/realtime-probe.mjs <organization-uuid>   # creds come from .env.local
+```
+
+`VERDICT: realtime works` means the socket, publication and RLS read path are
+all healthy; `no event within 8s` usually means the tables are missing from the
+`supabase_realtime` publication (re-run the realtime block of
+`supabase/schema.sql`) or the project is paused.
 
 CI runs `npm ci`, `npm run typecheck`, `npm run test` and `npm run build` on Node 20 for
 every push and pull request to `main` (`.github/workflows/ci.yml`).
@@ -273,6 +312,8 @@ src/
 supabase/
   schema.sql      tables, RLS, triggers, realtime
   seed.sql        demo tenant
+scripts/
+  realtime-probe.mjs  end-to-end realtime check against a live project
 ```
 
 Top-level config: `package.json`, `vite.config.ts`, `tsconfig.json`, `vitest.config.ts`,
