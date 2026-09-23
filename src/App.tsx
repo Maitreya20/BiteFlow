@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AppStoreProvider, useAppStore } from '@/store/AppStore'
 import { CartProvider } from '@/store/CartStore'
-import { ToastProvider } from '@/components/ui'
+import { LiveAnnouncer, ToastProvider } from '@/components/ui'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { MarketingLayout } from '@/components/layout/MarketingLayout'
 import { DashboardShell } from '@/components/layout/DashboardShell'
@@ -84,10 +84,35 @@ function Protected({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+/**
+ * The guest screens, mounted under both public URL shapes.
+ *
+ * A scanned table code points at `/r/:slug/table/:tableNumber`, while every
+ * in-app link once the diner is inside uses the same prefix — see
+ * `src/lib/publicRoutes.ts`. Sharing one set of child routes here keeps the two
+ * mount points from drifting; `/r/:slug` alone (no table) stays valid so a
+ * restaurant can still be linked without a table attached.
+ */
+const customerRoutes = (
+  <>
+    <Route index element={<CustomerHome />} />
+    <Route path="menu" element={<CustomerMenu />} />
+    <Route path="menu/:itemId" element={<DishDetail />} />
+    <Route path="cart" element={<CartPage />} />
+    <Route path="orders" element={<CustomerOrders />} />
+    <Route path="order/:orderId" element={<OrderTracking />} />
+    <Route path="bill" element={<BillPage />} />
+    <Route path="profile" element={<CustomerProfile />} />
+  </>
+)
+
 export default function App() {
   return (
     <AppStoreProvider>
       <ToastProvider>
+        {/* Above the router on purpose: live regions must outlive a navigation
+            to be able to announce one (see src/lib/announce.ts). */}
+        <LiveAnnouncer />
         <CartProvider>
           <ScrollToTop />
           <Routes>
@@ -153,16 +178,31 @@ export default function App() {
               <Route path="subscriptions" element={<AdminSubscriptions />} />
               <Route path="analytics" element={<AdminAnalytics />} />
               <Route path="audit" element={<AdminAudit />} />
-            </Route>            {/*-------------------------------------------- Customer (QR) */}
-            <Route path="/r/:slug" element={<ErrorBoundary><CustomerShell /></ErrorBoundary>}>
-              <Route index element={<CustomerHome />} />
-              <Route path="menu" element={<CustomerMenu />} />
-              <Route path="menu/:itemId" element={<DishDetail />} />
-              <Route path="cart" element={<CartPage />} />
-              <Route path="orders" element={<CustomerOrders />} />
-              <Route path="order/:orderId" element={<OrderTracking />} />
-              <Route path="bill" element={<BillPage />} />
-              <Route path="profile" element={<CustomerProfile />} />
+            </Route>
+
+            {/* ----------------------------------------------- Customer (QR)
+                The table is part of the URL, so scanning a table code opens the
+                guest menu with the table attached — and keeps it attached while
+                the diner moves between tabs, which the ordering flow needs. */}
+            <Route
+              path="/r/:slug/table/:tableNumber"
+              element={
+                <ErrorBoundary>
+                  <CustomerShell />
+                </ErrorBoundary>
+              }
+            >
+              {customerRoutes}
+            </Route>
+            <Route
+              path="/r/:slug"
+              element={
+                <ErrorBoundary>
+                  <CustomerShell />
+                </ErrorBoundary>
+              }
+            >
+              {customerRoutes}
             </Route>
 
             {/* ---- Empty state --- */}

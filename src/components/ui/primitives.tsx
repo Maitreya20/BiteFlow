@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { cn } from '@/lib/cn'
 import { Icon } from './Icon'
 import { avatarStyle, foodEmoji, foodTileStyle, initials } from '@/lib/format'
@@ -456,6 +456,8 @@ export function SegmentedControl<T extends string>({
   size = 'md',
   label,
   className,
+  keyShortcuts,
+  describedBy,
 }: {
   value: T
   onChange: (value: T) => void
@@ -464,23 +466,101 @@ export function SegmentedControl<T extends string>({
   /** Accessible name for the tab list. */
   label?: string
   className?: string
+  /** `aria-keyshortcuts` value when a global shortcut also drives this control. */
+  keyShortcuts?: string
+  /** id of an element describing what the current selection means. */
+  describedBy?: string
 }) {
+  const listRef = useRef<HTMLDivElement | null>(null)
+  const tabsRef = useRef(new Map<T, HTMLButtonElement | null>())
+  const selectedIndex = options.findIndex((opt) => opt.value === value)
+
+  /** Arrow keys move focus only; selection stays put. */
+  const focusTab = (index: number) => {
+    if (!options.length) return
+    const wrapped = ((index % options.length) + options.length) % options.length
+    tabsRef.current.get(options[wrapped].value)?.focus()
+  }
+
+  /**
+   * Where the arrow keys move *from*: the focused tab if focus is inside the
+   * group, otherwise the selected one. Anchoring on the selection would make
+   * repeated presses bounce between the same two tabs instead of walking.
+   */
+  const focusOrigin = () => {
+    const focused = document.activeElement
+    const index = options.findIndex((opt) => tabsRef.current.get(opt.value) === focused)
+    if (index !== -1) return index
+    return selectedIndex === -1 ? 0 : selectedIndex
+  }
+
+  /**
+   * The WAI-ARIA tabs keyboard model with **manual** activation: the arrow keys
+   * move focus, Enter/Space (or a click) selects. Automatic activation is wrong
+   * here — these are filters and, in the role switcher, session changes that hit
+   * the network. Browsing the group must never trigger one.
+   */
+  const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const from = focusOrigin()
+    switch (event.key) {
+      case 'ArrowRight':
+      case 'ArrowDown':
+        event.preventDefault()
+        focusTab(from + 1)
+        break
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        event.preventDefault()
+        focusTab(from - 1)
+        break
+      case 'Home':
+        event.preventDefault()
+        focusTab(0)
+        break
+      case 'End':
+        event.preventDefault()
+        focusTab(options.length - 1)
+        break
+      default:
+        break
+    }
+  }
+
+  // Roving tabindex makes the group a single tab stop. If the selection changes
+  // while the keyboard user is inside it, follow the selection — otherwise focus
+  // is left sitting on a tab that no longer describes the current state.
+  useEffect(() => {
+    const list = listRef.current
+    if (!list || !list.contains(document.activeElement)) return
+    tabsRef.current.get(value)?.focus()
+  }, [value])
+
   return (
     <div
+      ref={listRef}
       role="tablist"
       aria-label={label}
+      aria-keyshortcuts={keyShortcuts}
+      aria-describedby={describedBy}
+      onKeyDown={onKeyDown}
       className={cn(
         'inline-flex items-center gap-1 rounded-xl bg-surface-container-low p-1',
         className,
       )}
     >
-      {options.map((opt) => {
+      {options.map((opt, index) => {
         const active = opt.value === value
         return (
           <button
             key={opt.value}
+            ref={(node) => {
+              tabsRef.current.set(opt.value, node)
+            }}
             role="tab"
             aria-selected={active}
+            // One tab stop for the whole group: the selected tab, or the first
+            // when nothing matches (a signed-up account in the demo switcher).
+            tabIndex={active || (selectedIndex === -1 && index === 0) ? 0 : -1}
             type="button"
             onClick={() => onChange(opt.value)}
             className={cn(

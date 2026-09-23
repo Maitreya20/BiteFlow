@@ -35,6 +35,7 @@ export {
 } from './form'
 export type { InputProps, SelectProps } from './form'
 export { Modal, Drawer, ConfirmDialog, ToastProvider, useToast } from './overlay'
+export { LiveAnnouncer } from './LiveAnnouncer'
 export type { ToastTone } from './overlay'
 export { DataTable } from './table'
 export type { Column } from './table'

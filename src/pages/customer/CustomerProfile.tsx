@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { Badge, Button, Card, Icon, ProgressBar, useToast } from '@/components/ui'
 import { useAppStore } from '@/store/AppStore'
 import { getGuestOrders } from '@/lib/customerSession'
+import { publicBase } from '@/lib/publicRoutes'
 import { formatMoney, formatDate } from '@/lib/format'
 import type { Customer } from '@/lib/types'
 
@@ -12,7 +13,7 @@ export function CustomerProfile() {
   const toast = useToast()
 
   const org = db.organizations.find((o) => o.slug === slug) ?? null
-  const base = `/r/${slug}`
+  const base = publicBase(slug, tableNumber)
 
   const table = tableNumber
     ? db.tables.find(

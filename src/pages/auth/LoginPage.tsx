@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button, Card, Checkbox, Field, Icon, Input, useToast } from '@/components/ui'
 import { signIn } from '@/data/api'
@@ -17,9 +17,14 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  if (ready && session) {
-    navigate('/app/dashboard', { replace: true })
-  }
+  // Redirect an already-authenticated visitor away from /login. This runs in an
+  // effect rather than during render, otherwise React warns about updating the
+  // router while rendering another component.
+  useEffect(() => {
+    if (ready && session) {
+      navigate('/app/dashboard', { replace: true })
+    }
+  }, [ready, session, navigate])
 
   const submit = async (e?: React.FormEvent) => {
     e?.preventDefault()

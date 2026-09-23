@@ -14,6 +14,7 @@ _snapshot_extract/
 work-snapshot.patch
 work-snapshot.zip
 supabase/.temp/
+.freebuff/
 
 # IDE / OS
 Thumbs.db

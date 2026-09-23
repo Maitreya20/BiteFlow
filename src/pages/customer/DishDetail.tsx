@@ -2,13 +2,14 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Badge, Button, Card, EmptyState, FoodThumb, Icon, Textarea, useToast } from '@/components/ui'
 import { cn } from '@/lib/cn'
+import { publicBase } from '@/lib/publicRoutes'
 import { useAppStore } from '@/store/AppStore'
 import { useCart } from '@/store/CartStore'
 import { formatMoney } from '@/lib/format'
 import type { MenuOption } from '@/lib/types'
 
 export function DishDetail() {
-  const { slug = '', itemId = '' } = useParams()
+  const { slug = '', itemId = '', tableNumber } = useParams()
   const navigate = useNavigate()
   const toast = useToast()
   const cart = useCart()
@@ -65,7 +66,7 @@ export function DishDetail() {
           title="Dish not available"
           description="This item may have been removed from the menu."
           action={
-            <Link to={`/r/${slug}/menu`}>
+            <Link to={`${publicBase(slug, tableNumber)}/menu`}>
               <Button icon="arrow_back">Back to menu</Button>
             </Link>
           }
@@ -75,7 +76,7 @@ export function DishDetail() {
   }
 
   const branding = org.branding
-  const base = `/r/${slug}`
+  const base = publicBase(slug, tableNumber)
   const unitTotal = item.price + optionsTotal
   const lineTotal = unitTotal * quantity
 

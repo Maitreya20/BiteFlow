@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Badge, Button, Card, EmptyState, Icon, Modal, RadioGroup, useToast } from '@/components/ui'
 import { cn } from '@/lib/cn'
+import { publicBase } from '@/lib/publicRoutes'
 import { useAppStore } from '@/store/AppStore'
 import * as api from '@/data/api'
 import { getGuestOrders } from '@/lib/customerSession'
@@ -19,7 +20,7 @@ const METHODS: { value: PayMethod; label: string; description: string; icon: str
 ]
 
 export function BillPage() {
-  const { slug = '' } = useParams()
+  const { slug = '', tableNumber } = useParams()
   const navigate = useNavigate()
   const toast = useToast()
   const { db } = useAppStore()
@@ -29,7 +30,7 @@ export function BillPage() {
   const [stage, setStage] = useState<Stage>('method')
 
   const org = db.organizations.find((o) => o.slug === slug) ?? null
-  const base = `/r/${slug}`
+  const base = publicBase(slug, tableNumber)
 
   const bill = useMemo<Order | null>(() => {
     if (!org) return null

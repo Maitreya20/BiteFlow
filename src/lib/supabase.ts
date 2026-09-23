@@ -27,10 +27,33 @@ const hasCredentials =
 /** True when real Supabase credentials are wired up. */
 export const isSupabaseConfigured = hasCredentials && !forceDemo
 
-/** Public QR/menu links need a base URL; falls back to the current origin. */
-export const siteOrigin = (): string =>
-  (import.meta.env.VITE_PUBLIC_SITE_URL as string | undefined) ??
-  (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173')
+/**
+ * Public QR/menu links need a base URL.
+ *
+ * A wrong value here is unusually costly: it is baked into every printed and
+ * downloaded QR code, and the failure only shows up on someone else's phone. An
+ * unedited `VITE_PUBLIC_SITE_URL` template therefore has to be treated as "not
+ * configured" — exactly like the Supabase credential check above — instead of
+ * being trusted and producing codes that point at a domain that does not exist.
+ */
+const ORIGIN_PLACEHOLDER = /your-public-domain|your-project-ref|your-project-url|example\.(com|org|net)|<[^>]*>/i
+/** Origins that only resolve on the machine that produced them. */
+const LOCAL_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i
+
+export const siteOrigin = (): string => {
+  const configured = String(import.meta.env.VITE_PUBLIC_SITE_URL ?? '')
+    .trim()
+    .replace(/\/+$/, '')
+  const current = typeof window !== 'undefined' ? window.location.origin : ''
+  const fallback = current || 'http://localhost:5173'
+
+  if (!configured || ORIGIN_PLACEHOLDER.test(configured)) return fallback
+  // A localhost value that survived into a deployed build is worse than no
+  // value: the diner would be sent to their own device. Prefer where we are
+  // actually being served from.
+  if (LOCAL_ORIGIN.test(configured) && current && !LOCAL_ORIGIN.test(current)) return fallback
+  return configured
+}
 
 export const supabase: SupabaseClient | null = isSupabaseConfigured
   ? createClient(url as string, anonKey as string, {

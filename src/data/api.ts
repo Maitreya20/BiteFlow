@@ -57,11 +57,46 @@ export interface AuthSession {
 
 const SESSION_KEY = 'biteflow.session.v1'
 const DB_KEY = 'biteflow.demo-db.v3'
+const IMPERSONATION_KEY = 'biteflow.impersonation.v1'
+
+/**
+ * A super admin's stand-in session. While this is set, the Supabase token in the
+ * browser belongs to `targetEmail`, and the platform screens are not reachable
+ * until the actor's own token is restored.
+ */
+export interface ImpersonationState {
+  id: string
+  organizationId: string
+  organizationName: string
+  targetEmail: string
+  targetUserId: string
+  reason: string
+  startedAt: string
+  expiresAt: string
+}
+
+interface StoredImpersonation {
+  state: ImpersonationState
+  /**
+   * The acting super admin's tokens, captured before the swap so the switch can
+   * be undone without another sign-in. Held in the same localStorage bucket as
+   * the session itself — same exposure as the live session, and cleared the
+   * moment the impersonation ends.
+   */
+  actor: { accessToken: string; refreshToken: string }
+}
 
 /* --------------------------------------------------------------- internal state */
 
 let db: DemoDatabase = loadDemoDb()
 let session: AuthSession | null = readStoredSession()
+let impersonation: ImpersonationState | null = readStoredImpersonation()?.state ?? null
+/**
+ * The acting super admin's tokens, held in memory as well as storage. Storage is
+ * the durable copy (it survives a reload); memory is the one that always exists,
+ * so a browser with localStorage blocked can still hand control back.
+ */
+let impersonationActor: { accessToken: string; refreshToken: string } | null = null
 const listeners = new Set<() => void>()
 /** Demo-mode latency so loading skeletons are exercised realistically. */
 const LATENCY = 0
@@ -93,6 +128,26 @@ function readStoredSession(): AuthSession | null {
   }
 }
 
+function readStoredImpersonation(): StoredImpersonation | null {
+  if (typeof localStorage === 'undefined') return null
+  try {
+    const raw = localStorage.getItem(IMPERSONATION_KEY)
+    return raw ? (JSON.parse(raw) as StoredImpersonation) : null
+  } catch {
+    return null
+  }
+}
+
+function writeStoredImpersonation(value: StoredImpersonation | null) {
+  if (typeof localStorage === 'undefined') return
+  try {
+    if (value) localStorage.setItem(IMPERSONATION_KEY, JSON.stringify(value))
+    else localStorage.removeItem(IMPERSONATION_KEY)
+  } catch {
+    /* storage may be unavailable (private mode) */
+  }
+}
+
 function persist() {
   if (typeof localStorage === 'undefined') return
   try {
@@ -118,12 +173,24 @@ export function subscribe(listener: () => void): () => void {
   return () => listeners.delete(listener)
 }
 
-let cachedSnapshot: { db: DemoDatabase; session: AuthSession | null } = { db, session }
+let cachedSnapshot: { db: DemoDatabase; session: AuthSession | null; impersonation: ImpersonationState | null } = {
+  db,
+  session,
+  impersonation,
+}
 
 /** Stable snapshot — only a new reference when the dataset or session changed. */
-export function getSnapshot(): { db: DemoDatabase; session: AuthSession | null } {
-  if (cachedSnapshot.db !== db || cachedSnapshot.session !== session) {
-    cachedSnapshot = { db, session }
+export function getSnapshot(): {
+  db: DemoDatabase
+  session: AuthSession | null
+  impersonation: ImpersonationState | null
+} {
+  if (
+    cachedSnapshot.db !== db ||
+    cachedSnapshot.session !== session ||
+    cachedSnapshot.impersonation !== impersonation
+  ) {
+    cachedSnapshot = { db, session, impersonation }
   }
   return cachedSnapshot
 }
@@ -620,6 +687,11 @@ export async function signUp(input: {
 
 export async function signOut(): Promise<void> {
   if (MODE === 'live') await supabase?.auth.signOut()
+  // Signing out abandons an impersonation rather than restoring the actor — the
+  // 'exit impersonation' path is the one that hands control back.
+  impersonation = null
+  impersonationActor = null
+  writeStoredImpersonation(null)
   session = null
   persist()
   emit()
@@ -633,18 +705,10 @@ export async function loadSession(): Promise<AuthSession | null> {
       return null
     }
     db = await liveLoadAll()
-    const profile = db.profiles.find((p) => p.id === data.session!.user.id)
-    const ms = db.memberships.filter((m) => m.userId === data.session!.user.id)
-    session = {
-      user: {
-        id: data.session.user.id,
-        email: data.session.user.email ?? '',
-        fullName: profile?.fullName ?? 'Operator',
-        avatarUrl: profile?.avatarUrl ?? null,
-      },
-      memberships: ms.map((m) => ({ organizationId: m.organizationId, role: m.role })),
-      activeOrganizationId: ms[0]?.organizationId ?? db.organizations[0]?.id ?? '',
-    }
+    session = sessionFromDb(data.session.user.id, data.session.user.email ?? '')
+    // A token that is mid-impersonation must be reconciled with the database:
+    // if the grant expired or was ended from another tab, fall back to the actor.
+    await reconcileImpersonation()
   }
   return session
 }
@@ -658,6 +722,217 @@ export function switchOrganization(organizationId: string) {
   session = { ...session, activeOrganizationId: organizationId }
   emit()
 }
+
+/* ============================================================================
+   Impersonation — a super admin entering a tenant (prd.md §24)
+   ========================================================================= */
+
+/**
+ * Demo mode refuses outright: there is no server to enforce anything, so the
+ * demo role switcher keeps using plain `signIn()`.
+ *
+ * Live mode goes through the `impersonate` Edge Function, which derives the
+ * actor from the caller's JWT, re-checks the `super_admin` membership in
+ * Postgres (which also writes the audit row) and only then mints the target's
+ * session with the service role key.
+ */
+export function getImpersonation(): ImpersonationState | null {
+  return impersonation
+}
+
+/** True when the current session carries an active platform super-admin membership. */
+export function canImpersonate(): boolean {
+  return MODE === 'live' && session?.memberships.some((m) => m.role === 'super_admin') === true
+}
+
+function sessionFromDb(
+  userId: string,
+  email: string,
+  preferredOrganizationId?: string,
+): AuthSession {
+  const profile = db.profiles.find((p) => p.id === userId)
+  const memberships = db.memberships.filter((m) => m.userId === userId)
+  const preferred = memberships.find((m) => m.organizationId === preferredOrganizationId)
+  return {
+    user: {
+      id: userId,
+      email,
+      fullName: profile?.fullName ?? 'Operator',
+      avatarUrl: profile?.avatarUrl ?? null,
+    },
+    memberships: memberships.map((m) => ({ organizationId: m.organizationId, role: m.role })),
+    activeOrganizationId:
+      preferred?.organizationId ?? memberships[0]?.organizationId ?? db.organizations[0]?.id ?? '',
+  }
+}
+
+/** Surface the function's JSON error body instead of the generic HTTP failure. */
+async function functionErrorMessage(error: unknown): Promise<string> {
+  const response = (error as { context?: Response })?.context
+  if (response && typeof response.json === 'function') {
+    try {
+      const payload = (await response.json()) as { error?: string }
+      if (payload?.error) return payload.error
+    } catch {
+      /* not JSON — fall through to the generic message */
+    }
+  }
+  return error instanceof Error ? error.message : 'Impersonation failed'
+}
+
+/**
+ * Enter a tenant as its owner. Requires a live project; throws otherwise.
+ */
+export async function startImpersonation(
+  organizationId: string,
+  reason = '',
+): Promise<ImpersonationState> {
+  if (MODE !== 'live') {
+    throw new Error('Impersonation requires a live Supabase project — demo mode switches with signIn().')
+  }
+
+  // Checked before the role test: while impersonating, the token belongs to the
+  // tenant, so `canImpersonate()` is false and the vaguer error would win.
+  if (impersonation) {
+    throw new Error('Already impersonating — exit the current tenant first.')
+  }
+
+  // A UX guard only. The boundary is server-side: the Edge Function derives the
+  // actor from the JWT, and Postgres re-checks the membership, so a doctored
+  // client gets a 403 no matter what this function believes.
+  if (!canImpersonate()) {
+    throw new Error('Only an active platform super admin can impersonate a tenant.')
+  }
+
+  const sb = requireSupabase()
+  const { data: current, error: sessionError } = await sb.auth.getSession()
+  if (sessionError || !current.session) throw new Error('Your session has expired — sign in again.')
+
+  const actor = {
+    accessToken: current.session.access_token,
+    refreshToken: current.session.refresh_token,
+  }
+
+  const { data, error } = await sb.functions.invoke('impersonate', {
+    body: { organization_id: organizationId, reason },
+  })
+  if (error) throw new Error(await functionErrorMessage(error))
+
+  const payload = data as {
+    impersonation: {
+      id: string
+      organization_id: string
+      target_user_id: string
+      target_email: string
+      expires_at: string
+    }
+    session: { access_token: string; refresh_token: string }
+  }
+  if (!payload?.session?.access_token) throw new Error('The impersonation function returned no session.')
+
+  const { error: setError } = await sb.auth.setSession(payload.session)
+  if (setError) throw new Error(setError.message)
+
+  db = await liveLoadAll()
+  session = sessionFromDb(
+    payload.impersonation.target_user_id,
+    payload.impersonation.target_email,
+    organizationId,
+  )
+  impersonation = {
+    id: payload.impersonation.id,
+    organizationId,
+    organizationName: db.organizations.find((o) => o.id === organizationId)?.name ?? 'this tenant',
+    targetEmail: payload.impersonation.target_email,
+    targetUserId: payload.impersonation.target_user_id,
+    reason,
+    startedAt: new Date().toISOString(),
+    expiresAt: payload.impersonation.expires_at,
+  }
+  impersonationActor = actor
+  writeStoredImpersonation({ state: impersonation, actor })
+  persist()
+  emit()
+  return impersonation
+}
+
+/**
+ * Hand control back to the super admin. Safe to call repeatedly.
+ */
+export async function endImpersonation(): Promise<void> {
+  const stored = readStoredImpersonation()
+  const sessionId = stored?.state.id ?? impersonation?.id
+  const actorTokens = stored?.actor ?? impersonationActor
+  const sb = requireSupabase()
+
+  // Best effort, and deliberately first: the audit row is closed while we still
+  // hold the target's token. A failure here must never strand the super admin
+  // inside the tenant, so the restore below runs either way.
+  if (sessionId) {
+    try {
+      await sb.rpc('end_impersonation', { p_session_id: sessionId })
+    } catch {
+      /* the platform log is best-effort from the client; the row stays open and
+         `active_impersonation()` will refuse it once `expires_at` passes */
+    }
+  }
+
+  if (actorTokens) {
+    const { error } = await sb.auth.setSession({
+      access_token: actorTokens.accessToken,
+      refresh_token: actorTokens.refreshToken,
+    })
+    if (error) {
+      // The actor's token is unusable (revoked, or the refresh window closed) —
+      // go to a clean signed-out state instead of leaving the tenant session up.
+      await sb.auth.signOut()
+      impersonation = null
+      impersonationActor = null
+      writeStoredImpersonation(null)
+      session = null
+      persist()
+      emit()
+      return
+    }
+
+    db = await liveLoadAll()
+    const { data: actor } = await sb.auth.getUser()
+    session = actor.user ? sessionFromDb(actor.user.id, actor.user.email ?? '') : null
+  }
+
+  impersonation = null
+  impersonationActor = null
+  writeStoredImpersonation(null)
+  persist()
+  emit()
+}
+
+/**
+ * Reconcile a stored impersonation with the database on boot. Returns true when
+ * an expired grant was rolled back.
+ */
+async function reconcileImpersonation(): Promise<boolean> {
+  if (MODE !== 'live') return false
+  const stored = readStoredImpersonation()
+  if (!stored) {
+    impersonation = null
+    return false
+  }
+
+  const { data } = await requireSupabase().rpc('active_impersonation')
+  if (data) {
+    // Still inside the grant — keep the target's token and the banner.
+    impersonation = stored.state
+    impersonationActor = stored.actor
+    return false
+  }
+
+  await endImpersonation()
+  return true
+}
+
+/** Where the impersonating session should land. */
+export const IMPERSONATION_HOME = '/app/dashboard'
 
 /* ============================================================================
    Onboarding — create a tenant from the wizard (prd.md §8, §32)

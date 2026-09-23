@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Badge, EmptyState, Icon, SearchInput } from '@/components/ui'
 import { cn } from '@/lib/cn'
+import { publicBase } from '@/lib/publicRoutes'
 import { useAppStore } from '@/store/AppStore'
 import { DishRow } from './CustomerHome'
 import { formatMoney } from '@/lib/format'
@@ -9,7 +10,7 @@ import { formatMoney } from '@/lib/format'
 type SortKey = 'recommended' | 'price_asc' | 'price_desc' | 'fastest'
 
 export function CustomerMenu() {
-  const { slug = '' } = useParams()
+  const { slug = '', tableNumber } = useParams()
   const { db } = useAppStore()
   const [query, setQuery] = useState('')
   const [activeCategory, setActiveCategory] = useState<string>('all')
@@ -21,7 +22,7 @@ export function CustomerMenu() {
   const [sort, setSort] = useState<SortKey>('recommended')
 
   const org = db.organizations.find((o) => o.slug === slug) ?? null
-  const base = `/r/${slug}`
+  const base = publicBase(slug, tableNumber)
 
   const categories = useMemo(
     () =>

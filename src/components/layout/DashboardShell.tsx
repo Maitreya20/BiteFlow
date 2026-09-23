@@ -3,7 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import { cn } from '@/lib/cn'
 import { Avatar, Badge, Button, Icon } from '@/components/ui'
 import { APP_NAV, ADMIN_NAV, type BadgeKey, type NavGroup } from './nav'
-import { DemoRoleSwitcher } from './DemoRoleSwitcher'
+import { RoleSwitcher } from './RoleSwitcher'
 import { useAppStore } from '@/store/AppStore'
 import { PLANS } from '@/lib/plans'
 import { relativeTime } from '@/lib/format'
@@ -81,6 +81,8 @@ export function DashboardShell({
     switchOrganization,
     signOut,
     refresh,
+    impersonation,
+    endImpersonation,
   } = useAppStore()
 
   const navigate = useNavigate()
@@ -464,8 +466,8 @@ export function DashboardShell({
               </Button>
             </Link>
 
-            {/* Demo-only shortcut between the owner and super-admin sessions. */}
-            <DemoRoleSwitcher />
+            {/* Demo role tabs, or the live impersonation control for a super admin. */}
+            <RoleSwitcher />
 
             <Dropdown
               width={340}
@@ -566,7 +568,7 @@ export function DashboardShell({
                   </Link>
                 ) : null}
               </div>
-              <DemoRoleSwitcher presentation="menu" />
+              <RoleSwitcher presentation="menu" />
               <button
                 type="button"
                 onClick={() => void signOut().then(() => navigate('/'))}
@@ -577,6 +579,29 @@ export function DashboardShell({
             </Dropdown>
           </div>
         </header>
+
+        {/* While a super admin is standing in for a tenant, say so loudly: the
+            screens below belong to the tenant, not to them. */}
+        {impersonation && (
+          <div className="flex flex-wrap items-center gap-space-sm border-b border-status-warning/30 bg-status-warning-bg px-space-lg py-space-sm">
+            <Icon name="visibility" size={18} className="shrink-0 text-status-warning" />
+            <span className="font-label-sm text-label-sm font-semibold text-on-surface">
+              Viewing {impersonation.organizationName} as {impersonation.targetEmail}
+            </span>
+            <span className="font-label-xs text-label-xs text-on-surface-variant">
+              Audited impersonation · ends {new Date(impersonation.expiresAt).toLocaleTimeString()}
+            </span>
+            <Button
+              size="sm"
+              variant="danger-ghost"
+              icon="logout"
+              className="ml-auto"
+              onClick={() => void endImpersonation().then(() => navigate('/admin'))}
+            >
+              Exit impersonation
+            </Button>
+          </div>
+        )}
 
         <main className="w-full px-space-lg py-space-lg lg:px-space-xl">
           {(title || actions) && (

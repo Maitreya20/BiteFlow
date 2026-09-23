@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Badge, Button, Card, EmptyState, FoodThumb, Icon, SearchInput } from '@/components/ui'
 import { cn } from '@/lib/cn'
+import { publicBase } from '@/lib/publicRoutes'
 import { useAppStore } from '@/store/AppStore'
 import { useCart } from '@/store/CartStore'
 import { foodEmoji, foodTileStyle, formatMoney } from '@/lib/format'
@@ -45,7 +46,7 @@ export function CustomerHome() {
   if (!org) return null
 
   const branding = org.branding
-  const base = `/r/${slug}`
+  const base = publicBase(slug, tableNumber)
   const latestOrder = getLatestGuestOrder(org.id)
 
   return (

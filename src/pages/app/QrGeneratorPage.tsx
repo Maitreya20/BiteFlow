@@ -18,7 +18,7 @@ import { QrCode } from '@/components/QrCode'
 import { cn } from '@/lib/cn'
 import { useAppStore } from '@/store/AppStore'
 import * as api from '@/data/api'
-import { siteOrigin } from '@/lib/supabase'
+import { guestTableUrl } from '@/lib/publicRoutes'
 import type { RestaurantTable } from '@/lib/types'
 
 type Mode = 'single' | 'bulk'
@@ -40,8 +40,7 @@ export function QrGeneratorPage() {
   const org = organization
   const slug = org?.slug ?? ''
 
-  const guestUrl = (table: RestaurantTable) =>
-    `${siteOrigin()}/r/${slug}/table/${table.tableNumber.toLowerCase()}`
+  const guestUrl = (table: RestaurantTable) => guestTableUrl(slug, table.tableNumber)
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()

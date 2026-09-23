@@ -340,10 +340,15 @@ export function OrdersPage() {
         onConfirm={async () => {
           if (!cancelTarget) return
           setBusy(true)
-          await api.updateOrderStatus(cancelTarget.id, 'cancelled', { reason: 'Cancelled by staff' })
-          setBusy(false)
-          setCancelTarget(null)
-          toast.success('Order cancelled')
+          try {
+            await api.updateOrderStatus(cancelTarget.id, 'cancelled', { reason: 'Cancelled by staff' })
+            setCancelTarget(null)
+            toast.success('Order cancelled')
+          } finally {
+            // Reset in `finally`: a failed cancel used to leave `busy` true, so
+            // the confirm button spun forever and the dialog could not be closed.
+            setBusy(false)
+          }
         }}
         title="Cancel this order?"
         message={

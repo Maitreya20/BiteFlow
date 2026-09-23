@@ -27,7 +27,7 @@ import {
   type RestaurantTable,
   type TableStatus,
 } from '@/lib/types'
-import { siteOrigin } from '@/lib/supabase'
+import { guestTableUrl } from '@/lib/publicRoutes'
 import { useTicker } from '@/lib/hooks'
 
 const STATUS_TONES: Record<TableStatus, 'success' | 'warning' | 'info' | 'neutral'> = {
@@ -560,7 +560,7 @@ function TableDetail({
   onStatusChange: (status: TableStatus) => void
   onAssign: (waiterId: string | null, waiterName: string | null) => Promise<void>
 }) {
-  const guestUrl = `${siteOrigin()}/r/${slug}/table/${table.tableNumber.toLowerCase()}`
+  const guestUrl = guestTableUrl(slug, table.tableNumber)
 
   return (
     <div className="flex flex-col gap-space-lg p-space-xl">

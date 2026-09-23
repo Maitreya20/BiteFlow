@@ -36,6 +36,15 @@ function useEscape(active: boolean, onEscape?: () => void) {
   }, [active, onEscape])
 }
 
+/**
+ * Dimming scrim behind a modal/drawer.
+ *
+ * Deliberately **not** blurred. A full-screen `backdrop-blur` smears every pixel
+ * of the app behind the overlay, so the page a user just came from reads as
+ * broken rather than dimmed — worse on low-DPI displays where thin text and
+ * icons dissolve entirely. The scrim alone gives the same focus without
+ * destroying legibility of the context underneath.
+ */
 function Backdrop({ onClick }: { onClick?: () => void }) {
   return (
     <button
@@ -43,9 +52,19 @@ function Backdrop({ onClick }: { onClick?: () => void }) {
       tabIndex={-1}
       aria-label="Close overlay"
       onClick={onClick}
-      className="fixed inset-0 z-40 cursor-default bg-slate-950/45 backdrop-blur-[2px]"
+      className="fixed inset-0 z-40 cursor-default bg-slate-950/50"
     />
   )
+}
+
+/** Human-readable text for anything thrown by a confirmed action. */
+function errorText(error: unknown): string {
+  if (typeof error === 'string' && error.trim()) return error
+  if (error && typeof error === 'object' && 'message' in error) {
+    const message = String((error as { message?: unknown }).message ?? '').trim()
+    if (message) return message
+  }
+  return 'The action could not be completed.'
 }
 
 /* ------------------------------------------------------------------ Modal */
@@ -214,6 +233,15 @@ export function Drawer({
 
 /* ---------------------------------------------------------- ConfirmDialog */
 
+/**
+ * Confirmation dialog that owns the failure of the action it confirms.
+ *
+ * `onConfirm` is usually an async write, and a rejected write used to escape as
+ * an unhandled rejection: the dialog stayed open (so the app sat dimmed behind a
+ * scrim) with either a permanently spinning confirm button or no feedback at
+ * all, which reads as a frozen product. Catching here fixes every confirmation
+ * in the app at once instead of relying on each caller to remember a try/catch.
+ */
 export function ConfirmDialog({
   open,
   onClose,
@@ -227,7 +255,7 @@ export function ConfirmDialog({
 }: {
   open: boolean
   onClose: () => void
-  onConfirm: () => void
+  onConfirm: () => void | Promise<void>
   title: string
   message: ReactNode
   confirmLabel?: string
@@ -235,6 +263,40 @@ export function ConfirmDialog({
   destructive?: boolean
   loading?: boolean
 }) {
+  const [pending, setPending] = useState(false)
+  const [failure, setFailure] = useState<string | null>(null)
+  /**
+   * Guards re-entry synchronously. The `loading` state alone is not enough: two
+   * clicks in the same tick both read the pre-render value, and a duplicated
+   * confirmation here means a duplicated write (a cancelled order cancelled
+   * twice, a table reset twice).
+   */
+  const inFlight = useRef(false)
+
+  // A fresh confirmation must never inherit the previous failure, and nothing
+  // should be left pending once the dialog is gone.
+  useEffect(() => {
+    if (!open) {
+      setPending(false)
+      setFailure(null)
+    }
+  }, [open])
+
+  const run = async () => {
+    if (inFlight.current) return
+    inFlight.current = true
+    setFailure(null)
+    setPending(true)
+    try {
+      await onConfirm()
+    } catch (error) {
+      setFailure(errorText(error))
+    } finally {
+      inFlight.current = false
+      setPending(false)
+    }
+  }
+
   return (
     <Modal
       open={open}
@@ -243,21 +305,31 @@ export function ConfirmDialog({
       size="sm"
       footer={
         <>
-          <Button variant="secondary" size="sm" onClick={onClose}>
+          <Button variant="secondary" size="sm" onClick={onClose} disabled={pending}>
             {cancelLabel}
           </Button>
           <Button
             variant={destructive ? 'destructive' : 'primary'}
             size="sm"
-            onClick={onConfirm}
-            loading={loading}
+            onClick={() => void run()}
+            loading={loading || pending}
           >
             {confirmLabel}
           </Button>
         </>
       }
     >
-      <div className="font-body-md text-body-md text-on-surface-variant">{message}</div>
+      <div className="flex flex-col gap-space-md">
+        <div className="font-body-md text-body-md text-on-surface-variant">{message}</div>
+        {failure && (
+          <p
+            role="alert"
+            className="rounded-xl border border-status-critical/30 bg-status-critical-bg px-space-md py-space-sm font-body-sm text-body-sm text-status-critical"
+          >
+            {failure}
+          </p>
+        )}
+      </div>
     </Modal>
   )
 }

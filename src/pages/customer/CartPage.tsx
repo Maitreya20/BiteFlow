@@ -16,6 +16,7 @@ import { useAppStore } from '@/store/AppStore'
 import { useCart } from '@/store/CartStore'
 import * as api from '@/data/api'
 import { rememberOrder } from '@/lib/customerSession'
+import { publicBase } from '@/lib/publicRoutes'
 import { formatMoney } from '@/lib/format'
 import type { OrderChannel } from '@/lib/types'
 
@@ -42,7 +43,7 @@ export function CartPage() {
   if (!org) return null
 
   const branding = org.branding
-  const base = `/r/${slug}`
+  const base = publicBase(slug, tableNumber)
   const currency = branding.currency
   const tax = Math.round((cart.subtotal * branding.taxPercent) / 100)
   const service = Math.round((cart.subtotal * branding.serviceChargePercent) / 100)

@@ -4,17 +4,18 @@ import { Badge, Button, Card, EmptyState, Icon } from '@/components/ui'
 import { useAppStore } from '@/store/AppStore'
 import { useCart } from '@/store/CartStore'
 import { getGuestOrders } from '@/lib/customerSession'
+import { publicBase } from '@/lib/publicRoutes'
 import { formatMoney, formatTime, relativeTime } from '@/lib/format'
 import { ORDER_STATUS_LABELS } from '@/lib/types'
 
 export function CustomerOrders() {
-  const { slug = '' } = useParams()
+  const { slug = '', tableNumber } = useParams()
   const navigate = useNavigate()
   const cart = useCart()
   const { db } = useAppStore()
 
   const org = db.organizations.find((o) => o.slug === slug) ?? null
-  const base = `/r/${slug}`
+  const base = publicBase(slug, tableNumber)
 
   const orders = useMemo(() => {
     if (!org) return []

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Badge, Button, Card, Drawer, EmptyState, Icon, useToast } from '@/components/ui'
 import { cn } from '@/lib/cn'
+import { publicBase } from '@/lib/publicRoutes'
 import { useAppStore } from '@/store/AppStore'
 import * as api from '@/data/api'
 import { elapsed, formatMoney, formatTime } from '@/lib/format'
@@ -18,7 +19,7 @@ const REQUEST_ICONS: Record<ServiceRequestType, string> = {
 }
 
 export function OrderTracking() {
-  const { slug = '', orderId = '' } = useParams()
+  const { slug = '', orderId = '', tableNumber } = useParams()
   const navigate = useNavigate()
   const toast = useToast()
   const { db } = useAppStore()
@@ -47,7 +48,7 @@ export function OrderTracking() {
   if (!org) return null
 
   const branding = org.branding
-  const base = `/r/${slug}`
+  const base = publicBase(slug, tableNumber)
 
   if (!order) {
     return (

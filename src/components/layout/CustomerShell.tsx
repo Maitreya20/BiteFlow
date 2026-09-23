@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { cn } from '@/lib/cn'
+import { publicBase } from '@/lib/publicRoutes'
 import { Badge, Button, Drawer, Icon, useToast, Avatar } from '@/components/ui'
 import { useCart } from '@/store/CartStore'
 import { resolvePublicContext, createServiceRequest } from '@/data/api'
@@ -45,7 +46,9 @@ export function CustomerShell() {
   }
 
   const branding = org.branding
-  const base = `/r/${slug}`
+  // Every guest link carries the table, so a diner who scans a table code and
+  // then taps through to the menu still orders against that table.
+  const base = publicBase(slug, tableNumber)
   const activeTab = (() => {
     if (pathname.includes('/cart')) return 'cart'
     if (pathname.includes('/order/')) return 'orders'

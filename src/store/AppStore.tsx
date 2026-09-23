@@ -53,6 +53,13 @@ interface AppStoreValue {
   mode: 'live' | 'demo'
   signingOut: boolean
 
+  /** Set while a super admin is standing in for a tenant's owner. */
+  impersonation: api.ImpersonationState | null
+  /** Live mode + an active super-admin membership: may enter a tenant. */
+  canImpersonate: boolean
+  startImpersonation: (organizationId: string, reason?: string) => Promise<void>
+  endImpersonation: () => Promise<void>
+
   orders: Order[]
   tables: RestaurantTable[]
   menuItems: MenuItem[]
@@ -97,7 +104,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const { db, session } = snapshot
+  const { db, session, impersonation } = snapshot
 
   const organization = useMemo(
     () => db.organizations.find((o) => o.id === session?.activeOrganizationId) ?? null,
@@ -215,6 +222,12 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     role,
     mode: api.MODE,
     signingOut,
+    impersonation,
+    canImpersonate: api.canImpersonate(),
+    startImpersonation: async (organizationId: string, reason?: string) => {
+      await api.startImpersonation(organizationId, reason)
+    },
+    endImpersonation: api.endImpersonation,
     ...scope,
     employees,
     profiles: db.profiles,
