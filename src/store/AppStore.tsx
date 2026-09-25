@@ -52,6 +52,8 @@ interface AppStoreValue {
   role: Role
   mode: 'live' | 'demo'
   signingOut: boolean
+  /** Socket health in live mode; 'demo' when no backend. Drives the header chip. */
+  realtimeStatus: api.ConnectionStatus
 
   /** Set while a super admin is standing in for a tenant's owner. */
   impersonation: api.ImpersonationState | null
@@ -104,7 +106,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const { db, session, impersonation } = snapshot
+  const { db, session, impersonation, realtimeStatus } = snapshot
 
   const organization = useMemo(
     () => db.organizations.find((o) => o.id === session?.activeOrganizationId) ?? null,
@@ -222,6 +224,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     role,
     mode: api.MODE,
     signingOut,
+    realtimeStatus,
     impersonation,
     canImpersonate: api.canImpersonate(),
     startImpersonation: async (organizationId: string, reason?: string) => {

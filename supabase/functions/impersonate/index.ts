@@ -25,8 +25,10 @@
  * Deploy: `supabase functions deploy impersonate`
  */
 
-import { serve } from 'https://deno.land/std@0.202.0/http/server'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+// `serve` from std/http is no longer needed: the Edge Runtime provides
+// `Deno.serve` natively, and jsr specifiers bundle more reliably than the
+// deprecated deno.land/std@0.202.0 module used previously.
+import { createClient } from 'jsr:@supabase/supabase-js@2'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!
@@ -47,7 +49,7 @@ const json = (body: unknown, status = 200) =>
 const isForbidden = (error: { message?: string; code?: string } | null): boolean =>
   Boolean(error) && (error!.code === '42501' || /not a platform super admin|authentication required/i.test(error!.message ?? ''))
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: CORS_HEADERS })
   }

@@ -211,10 +211,44 @@ export function subscribe(listener: () => void): () => void {
   return () => listeners.delete(listener)
 }
 
-let cachedSnapshot: { db: DemoDatabase; session: AuthSession | null; impersonation: ImpersonationState | null } = {
+/* ----------------------------------------------------------------------------
+   Connection state.
+
+   Staff need to know whether the numbers on screen are live. Three states a
+   dashboard can be in, plus demo mode which is not a connection at all:
+
+   • 'live'      — the realtime socket is SUBSCRIBED; Postgres changes stream in.
+   • 'connecting'— socket requested, not yet confirmed (also the state after a
+                   drop, while Supabase retries).
+   • 'degraded'  — the socket reported CHANNEL_ERROR or TIMED_OUT. The screen is
+                   stale by definition: show it, and offer a manual refresh.
+   • 'demo'      — no backend; data is local and cross-tab synced only.
+   -------------------------------------------------------------------------- */
+export type ConnectionStatus = 'live' | 'connecting' | 'degraded' | 'demo'
+
+let realtimeStatus: ConnectionStatus = MODE === 'live' ? 'connecting' : 'demo'
+
+/** Current connection status (reactive via getSnapshot; stable otherwise). */
+export function getConnectionStatus(): ConnectionStatus {
+  return realtimeStatus
+}
+
+function setRealtimeStatus(status: ConnectionStatus): void {
+  if (realtimeStatus === status) return
+  realtimeStatus = status
+  emit()
+}
+
+let cachedSnapshot: {
+  db: DemoDatabase
+  session: AuthSession | null
+  impersonation: ImpersonationState | null
+  realtimeStatus: ConnectionStatus
+} = {
   db,
   session,
   impersonation,
+  realtimeStatus,
 }
 
 /** Stable snapshot — only a new reference when the dataset or session changed. */
@@ -222,13 +256,15 @@ export function getSnapshot(): {
   db: DemoDatabase
   session: AuthSession | null
   impersonation: ImpersonationState | null
+  realtimeStatus: ConnectionStatus
 } {
   if (
     cachedSnapshot.db !== db ||
     cachedSnapshot.session !== session ||
-    cachedSnapshot.impersonation !== impersonation
+    cachedSnapshot.impersonation !== impersonation ||
+    cachedSnapshot.realtimeStatus !== realtimeStatus
   ) {
-    cachedSnapshot = { db, session, impersonation }
+    cachedSnapshot = { db, session, impersonation, realtimeStatus }
   }
   return cachedSnapshot
 }
@@ -2055,14 +2091,19 @@ export function subscribeRealtime(organizationId: string): () => void {
   })
   // A socket that dies silently is the failure mode nobody can debug after the
   // fact: the dashboard just stops updating with nothing in the console. Track
-  // the status, and pull a full snapshot on reconnect — events missed while the
-  // socket was down are gone forever, but a snapshot is always current.
+  // the status (surfaced in the header chip), and pull a full snapshot on
+  // reconnect — events missed while the socket was down are gone forever, but a
+  // snapshot is always current.
   channel.subscribe((status) => {
     if (status === 'SUBSCRIBED') {
       console.info(`[biteflow] realtime connected for org ${organizationId}`)
+      setRealtimeStatus('live')
     } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
       console.warn(`[biteflow] realtime ${status} — realtime updates are degraded until reconnect`)
+      setRealtimeStatus('degraded')
     } else if (status === 'CLOSED') {
+      // Supabase retries automatically; reflect that instead of claiming live.
+      setRealtimeStatus('connecting')
       void refresh()
     }
   })

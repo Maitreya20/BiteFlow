@@ -4,6 +4,7 @@ import { cn } from '@/lib/cn'
 import { Avatar, Badge, Button, Icon } from '@/components/ui'
 import { APP_NAV, ADMIN_NAV, type BadgeKey, type NavGroup } from './nav'
 import { RoleSwitcher } from './RoleSwitcher'
+import { ConnectionBadge } from './ConnectionBadge'
 import { useAppStore } from '@/store/AppStore'
 import { PLANS } from '@/lib/plans'
 import { relativeTime } from '@/lib/format'
@@ -459,6 +460,9 @@ export function DashboardShell({
                 </span>
               </div>
             )}
+
+            {/* Live / connecting / offline / demo — the dashboard's data source of truth. */}
+            <ConnectionBadge className="hidden sm:inline-flex" />
 
             <Link to="/app/orders" className="hidden sm:block">
               <Button size="sm" icon="add">
