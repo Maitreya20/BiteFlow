@@ -19,3 +19,6 @@ supabase/.temp/
 # IDE / OS
 Thumbs.db
 *.log
+
+.vercel
+.env*
