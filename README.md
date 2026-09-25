@@ -295,6 +295,31 @@ all healthy; `no event within 8s` usually means the tables are missing from the
 `supabase_realtime` publication (re-run the realtime block of
 `supabase/schema.sql`) or the project is paused.
 
+#### Live schema smoke test
+
+`scripts/live-smoke.mjs` catches drift between the migrations this repo ships
+and what actually exists on the hosted project — useful when the database can
+be changed from several places (CLI, dashboard, MCP) and nothing records *why*
+a policy disappeared. It asserts the contract the app depends on, not the
+migration file names:
+```bash
+npm run smoke                                       # client checks only
+SUPABASE_ACCESS_TOKEN=sbpat_xxx npm run smoke       # + SQL contract checks
+```
+
+Client checks (anon key only): every contract table is exposed over REST,
+`order_number_counters` / `impersonation_sessions` are still blocked for anon
+(the 003/004 boundary), auth answers, and a realtime channel subscribes.
+
+SQL checks (need a personal access token from
+[supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens)):
+tables exist with RLS on, the named policies from 001/003/004 are present, the
+SECURITY DEFINER helper signatures match (`rollback_order_number` returning
+`integer`, not the pre-003 `void`), grants match the guest/tenant boundary,
+`supabase_realtime` still publishes all four tables, and the order-number
+trigger is attached. Exit code is non-zero on any failure, so a deploy
+pipeline can gate on it.
+
 CI runs `npm ci`, `npm run typecheck`, `npm run test` and `npm run build` on Node 20 for
 every push and pull request to `main` (`.github/workflows/ci.yml`).
 
@@ -314,6 +339,7 @@ supabase/
   seed.sql        demo tenant
 scripts/
   realtime-probe.mjs  end-to-end realtime check against a live project
+  live-smoke.mjs      hosted-schema contract check (drift detection)
 ```
 
 Top-level config: `package.json`, `vite.config.ts`, `tsconfig.json`, `vitest.config.ts`,
