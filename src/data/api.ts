@@ -1403,6 +1403,49 @@ export interface PlaceOrderInput {
   serviceChargePercent: number
 }
 
+/* ----------------------------------------------------------------------------
+   Guest session orders.
+
+   Guests browse on the anon key, and anon can never read the orders table
+   back (no SELECT policy by design — guests must not be able to enumerate
+   other tenants' orders). Two consequences the UI must survive:
+
+   1. Any `refresh()` (realtime event, reconnect) rebuilds the store from the
+      network and silently evicts the order the guest just placed from view.
+   2. The dashboard subscribes as a staff member, so the guest never sees
+      kitchen status transitions (accepted → preparing → ready) in realtime.
+
+   So orders placed in this browser session are pinned by id: they survive
+   refresh(), and the tracking screen polls `get_guest_order` (a
+   SECURITY DEFINER rpc, migration 005) which returns the single row the
+   guest's unguessable order uuid grants them.
+   -------------------------------------------------------------------------- */
+const guestSessionOrders = new Set<string>()
+
+/** True if this order was placed in this browser session (anon-visible). */
+export function isGuestSessionOrder(orderId: string): boolean {
+  return guestSessionOrders.has(orderId)
+}
+
+/** Pull the guest's own order + line items from the server (live mode). */
+export async function fetchGuestOrder(orderId: string): Promise<{ order: Order; items: OrderItem[] } | null> {
+  if (MODE !== 'live') return null
+  // Postgres rejects a non-uuid with a 400 (22P02) before the rpc even runs;
+  // callers use the null return to mean "genuinely not found", so short-circuit
+  // malformed ids here instead of surfacing them as a poll failure.
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId)) return null
+  const sb = requireSupabase()
+  const { data, error } = await sb.rpc('get_guest_order', { p_order_id: orderId })
+  if (error) throw new Error(error.message)
+  if (!data) return null
+  const itemsResult = await sb.rpc('get_guest_order_items', { p_order_id: orderId })
+  if (itemsResult.error) throw new Error(itemsResult.error.message)
+  return {
+    order: mapOrder(data as Record<string, unknown>),
+    items: ((itemsResult.data ?? []) as Record<string, unknown>[]).map(mapOrderItem),
+  }
+}
+
 export async function placeOrder(input: PlaceOrderInput): Promise<Order> {
   const org = db.organizations.find((o) => o.id === input.organizationId)
   const orderId = uid('ord')
@@ -1472,35 +1515,37 @@ export async function placeOrder(input: PlaceOrderInput): Promise<Order> {
   // throw before touching local state, so the two backends never drift apart.
   if (MODE === 'live') {
     const sb = requireSupabase()
-    const { data: inserted, error } = await sb
-      .from('orders')
-      .insert({
-        id: order.id,
-        organization_id: order.organizationId,
-        order_number: order.orderNumber,
-        channel: order.channel,
-        table_id: order.tableId,
-        table_number: order.tableNumber,
-        customer_id: order.customerId,
-        customer_name: order.customerName,
-        status: order.status,
-        subtotal: order.subtotal,
-        tax_amount: order.taxAmount,
-        service_charge: order.serviceCharge,
-        discount: order.discount,
-        total: order.total,
-        notes: order.notes,
-        allergy_note: order.allergyNote,
-        kitchen_note: order.kitchenNote,
-        payment_status: order.paymentStatus,
-        placed_at: order.placedAt,
-      })
-      .select('order_number')
-      .single()
+    // anon has no SELECT policy on orders (guests must not read the table
+    // back), so the insert must NOT ask PostgREST for RETURNING data — that
+    // fails with a misleading 42501 naming the INSERT. The real BF-####
+    // number stays server-side; the tracking screen picks it up via
+    // fetchGuestOrder() (migration 005 rpc).
+    const { error } = await sb.from('orders').insert({
+      id: order.id,
+      organization_id: order.organizationId,
+      order_number: order.orderNumber,
+      channel: order.channel,
+      table_id: order.tableId,
+      table_number: order.tableNumber,
+      customer_id: order.customerId,
+      customer_name: order.customerName,
+      status: order.status,
+      subtotal: order.subtotal,
+      tax_amount: order.taxAmount,
+      service_charge: order.serviceCharge,
+      discount: order.discount,
+      total: order.total,
+      notes: order.notes,
+      allergy_note: order.allergyNote,
+      kitchen_note: order.kitchenNote,
+      payment_status: order.paymentStatus,
+      placed_at: order.placedAt,
+    })
     if (error) throw new Error(error.message)
-    // The BEFORE INSERT trigger may have overwritten order_number with the
-    // DB-allocated BF number — read it back so the local order matches.
-    order.orderNumber = (inserted as Record<string, unknown>).order_number as string
+
+    // The client-side id is the guest's capability token: pin it so the order
+    // survives refresh() and the rpc can fetch it back.
+    guestSessionOrders.add(order.id)
 
     const { error: itemsError } = await sb.from('order_items').insert(
       items.map((i) => ({
@@ -1620,10 +1665,15 @@ export async function payOrder(
   order.status = 'completed'
   order.completedAt = order.completedAt ?? new Date().toISOString()
   if (MODE === 'live') {
-    await requireSupabase()
-      .from('orders')
-      .update({ payment_status: 'paid', payment_method: method, status: 'completed' })
-      .eq('id', orderId)
+    // An anon UPDATE can never see its target row (row visibility for UPDATE
+    // also requires a SELECT policy, and anon has none on orders) — the old
+    // direct update returned 204 while writing nothing. Migration 005's
+    // SECURITY DEFINER rpc does the validation server-side instead.
+    const { error } = await requireSupabase().rpc('settle_guest_order', {
+      p_order_id: orderId,
+      p_method: method,
+    })
+    if (error) throw new Error(error.message)
   }
   logAudit({
     organizationId: order.organizationId,
@@ -2115,7 +2165,16 @@ export function subscribeRealtime(organizationId: string): () => void {
 /** Re-pull the dataset from the backend (used by realtime + manual refresh). */
 export async function refresh(): Promise<void> {
   if (MODE !== 'live') return
-  db = await liveLoadAll()
+  const next = await liveLoadAll()
+  // This browser's guest orders are invisible to anon (no SELECT policy on
+  // orders) so the network snapshot can never contain them — pin them into
+  // the refreshed store or the guest's own tracking screen would go blank on
+  // the first realtime tick.
+  const pinned = db.orders.filter((o) => guestSessionOrders.has(o.id))
+  for (const o of pinned) {
+    if (!next.orders.some((n) => n.id === o.id)) next.orders.unshift(o)
+  }
+  db = next
   emit()
 }
 

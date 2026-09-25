@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Badge, Button, Card, Drawer, EmptyState, Icon, useToast } from '@/components/ui'
 import { cn } from '@/lib/cn'
@@ -6,7 +6,7 @@ import { publicBase } from '@/lib/publicRoutes'
 import { useAppStore } from '@/store/AppStore'
 import * as api from '@/data/api'
 import { elapsed, formatMoney, formatTime } from '@/lib/format'
-import { ORDER_STATUS_LABELS, SERVICE_REQUEST_LABELS, type ServiceRequestType } from '@/lib/types'
+import { ORDER_STATUS_LABELS, SERVICE_REQUEST_LABELS, type Order, type ServiceRequestType } from '@/lib/types'
 import { useTicker } from '@/lib/hooks'
 
 const REQUEST_ICONS: Record<ServiceRequestType, string> = {
@@ -27,8 +27,46 @@ export function OrderTracking() {
 
   const [helpOpen, setHelpOpen] = useState(false)
 
+  // Guests ride on the anon key, which cannot receive realtime order events
+  // (postgres_changes enforces the subscriber's SELECT rights). In live mode
+  // the tracking screen therefore polls the guest rpc for authoritative
+  // status: the round-trip also fills in the server-allocated BF number once
+  // the first poll lands.
+  const isLive = api.getConnectionStatus() !== 'demo'
+  const [polled, setPolled] = useState<Order | null>(null)
+  const [pollFailed, setPollFailed] = useState(false)
+  // "Located" means the rpc answered (found or definitively not found) at
+  // least once; before that a live guest is in the transient "finding" state.
+  const [pollDone, setPollDone] = useState(false)
+  useEffect(() => {
+    if (!isLive) return
+    let cancelled = false
+    const tick = async () => {
+      try {
+        const result = await api.fetchGuestOrder(orderId)
+        if (!cancelled) {
+          // Merge the server's line items in: after a page reload the store
+          // copy is gone and the rpc is the only source for the ticket body.
+          setPolled(result ? { ...result.order, items: result.items } : null)
+          setPollDone(true)
+          setPollFailed(false)
+        }
+      } catch {
+        if (!cancelled) setPollFailed(true)
+      }
+    }
+    void tick()
+    const timer = setInterval(tick, 10_000)
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+    }
+  }, [isLive, orderId])
+
   const org = db.organizations.find((o) => o.slug === slug) ?? null
-  const order = db.orders.find((o) => o.id === orderId) ?? null
+  // Authoritative data (server status, BF number) wins when present; the
+  // optimistic in-store copy is the fallback and the instant first paint.
+  const order = polled ?? db.orders.find((o) => o.id === orderId) ?? null
   const table = order?.tableId ? db.tables.find((t) => t.id === order.tableId) ?? null : null
 
   const steps = useMemo(
@@ -51,16 +89,30 @@ export function OrderTracking() {
   const base = publicBase(slug, tableNumber)
 
   if (!order) {
+    // A live guest with no store copy (e.g. after a page reload) can be in one
+    // of three states before the first successful poll lands: still locating,
+    // transiently unreachable, or genuinely not found. Only the last one is
+    // a real dead end.
+    const locating = isLive && !pollDone
+    const transient = isLive && pollDone && pollFailed
     return (
       <div className="px-space-lg py-space-xl">
         <EmptyState
-          icon="receipt_long"
-          title="Order not found"
-          description="This order may belong to another session or was cleared."
+          icon={locating ? 'search' : transient ? 'cloud_sync' : 'receipt_long'}
+          title={locating ? 'Finding your order…' : transient ? 'Reconnecting…' : 'Order not found'}
+          description={
+            locating
+              ? 'Connecting to the kitchen — this only takes a moment.'
+              : transient
+                ? 'We lost the connection while fetching your order and are retrying automatically.'
+                : 'This order may belong to another session or was cleared.'
+          }
           action={
-            <Link to={`${base}/menu`}>
-              <Button icon="restaurant_menu">Back to the menu</Button>
-            </Link>
+            locating || transient ? null : (
+              <Link to={`${base}/menu`}>
+                <Button icon="restaurant_menu">Back to the menu</Button>
+              </Link>
+            )
           }
         />
       </div>
@@ -125,6 +177,15 @@ export function OrderTracking() {
           </span>
         )}
       </div>
+
+      {isLive && pollFailed && (
+        <div className="flex items-start gap-space-sm rounded-xl bg-status-warning-bg p-space-md">
+          <Icon name="wifi_off" size={17} className="mt-0.5 shrink-0 text-status-warning" />
+          <span className="font-body-sm text-body-sm text-on-surface">
+            Connection blip — showing your last known order status. It refreshes automatically.
+          </span>
+        </div>
+      )}
 
       {isCancelled && (
         <div className="flex items-start gap-space-sm rounded-xl bg-status-critical-bg p-space-md">
